@@ -40,4 +40,4 @@ jobs:
       working-directory: backend
 
     - name: Verify Docker Compose Build
-      run: docker-compose build
+      run: docker compose build
