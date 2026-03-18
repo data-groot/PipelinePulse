@@ -1,0 +1,39 @@
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# MacOS
+.DS_Store
+
+# Node modules
+node_modules/
+dist/
+.next/
+out/
+build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.db
+*.sqlite3
+.pytest_cache/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Airflow
+airflow/logs/
