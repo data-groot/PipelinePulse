@@ -1,0 +1,12 @@
+pipelinepulse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
+      user: "{{ env_var('DBT_USER', 'postgres') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'postgres') }}"
+      port: "{{ env_var('DBT_PORT', '5432') | as_number }}"
+      dbname: "{{ env_var('DBT_DATABASE', 'pipelinepulse') }}"
+      schema: public
+      threads: 4

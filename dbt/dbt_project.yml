@@ -1,0 +1,13 @@
+name: 'pipelinepulse'
+version: '1.0.0'
+config-version: 2
+profile: 'pipelinepulse'
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+models:
+  pipelinepulse:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

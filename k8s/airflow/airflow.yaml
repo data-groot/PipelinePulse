@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+  namespace: pipelinepulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-webserver
+  template:
+    metadata:
+      labels:
+        app: airflow-webserver
+    spec:
+      containers:
+      - name: airflow-webserver
+        image: pipelinepulse-airflow:latest
+        imagePullPolicy: IfNotPresent
+        command: ["airflow", "webserver"]
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: pipelinepulse-config
+        - secretRef:
+            name: pipelinepulse-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver-service
+  namespace: pipelinepulse
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: airflow-webserver
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+  namespace: pipelinepulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app: airflow-scheduler
+    spec:
+      containers:
+      - name: airflow-scheduler
+        image: pipelinepulse-airflow:latest
+        imagePullPolicy: IfNotPresent
+        command: ["airflow", "scheduler"]
+        envFrom:
+        - configMapRef:
+            name: pipelinepulse-config
+        - secretRef:
+            name: pipelinepulse-secrets

@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dbt-runner
+  namespace: pipelinepulse
+spec:
+  template:
+    metadata:
+      creationTimestamp: null
+    spec:
+      containers:
+      - name: dbt-runner
+        image: pipelinepulse-dbt:latest
+        imagePullPolicy: IfNotPresent
+        command: ["dbt", "run"]
+        envFrom:
+        - configMapRef:
+            name: pipelinepulse-config
+        - secretRef:
+            name: pipelinepulse-secrets
+      restartPolicy: OnFailure
