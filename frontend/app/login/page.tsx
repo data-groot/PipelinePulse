@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLogin } from "@/lib/api";
+import { fetchToken } from "@/lib/api";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,14 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
-  const loginMutation = useLogin();
+  const loginMutation = useMutation({
+    mutationFn: ({ username, password }: any) => fetchToken(username, password),
+    onSuccess: (data) => {
+       if (typeof window !== 'undefined') {
+         localStorage.setItem('token', data.access_token);
+       }
+    }
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

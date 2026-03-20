@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchPipelines, fetchPipelineRuns, triggerPipeline, togglePipeline, fetchToken } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -26,12 +26,13 @@ export default function PipelinesPage() {
   const { data: pipelines, isLoading: loadingPipelines } = useQuery({
     queryKey: ['pipelines'],
     queryFn: fetchPipelines,
-    onSuccess: (data) => {
-      if (data && data.length > 0 && !selectedTab) {
-        setSelectedTab(data[0].name);
-      }
-    }
   });
+
+  useEffect(() => {
+    if (pipelines && pipelines.length > 0 && !selectedTab) {
+      setSelectedTab(pipelines[0].name);
+    }
+  }, [pipelines, selectedTab]);
 
   const { data: runs, isLoading: loadingRuns } = useQuery({
     queryKey: ['pipeline-runs', selectedTab],
