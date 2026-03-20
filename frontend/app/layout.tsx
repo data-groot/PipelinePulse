@@ -1,35 +1,42 @@
-import type { Metadata } from "next";
-import { Inter, Roboto_Mono } from "next/font/google";
-import { Providers } from "@/providers/query-provider";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { Providers } from './providers';
+import { AppSidebar } from '@/components/layout/app-sidebar';
+import {
+  SidebarProvider,
+  SidebarTrigger,
+  SidebarInset,
+} from '@/components/ui/sidebar';
+import { Toaster } from '@/components/ui/sonner';
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const robotoMono = Roboto_Mono({ subsets: ["latin"], variable: "--font-roboto-mono" });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "PipelinePulse - ETL Observability",
-  description: "Real-time ETL pipeline observability and dashboard",
+  title: 'PipelinePulse',
+  description: 'ETL Observability Platform',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" suppressHydrationWarning className="dark">
-      <body className={`${inter.variable} ${robotoMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          <Providers>
-            {children}
-            <Toaster />
-          </Providers>
-        </ThemeProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <Providers>
+          <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+              <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                <SidebarTrigger className="-ml-1" />
+              </header>
+              <main className="flex-1 p-6">{children}</main>
+            </SidebarInset>
+          </SidebarProvider>
+        </Providers>
+        <Toaster />
       </body>
     </html>
   );
