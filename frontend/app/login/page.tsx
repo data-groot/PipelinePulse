@@ -11,24 +11,27 @@ import { toast } from "sonner";
 import { Activity } from "lucide-react";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
   const loginMutation = useMutation({
-    mutationFn: ({ username, password }: any) => fetchToken(username, password),
+    mutationFn: ({ email, password }: { email: string; password: string }) =>
+      fetchToken(email, password),
     onSuccess: (data) => {
-       if (typeof window !== 'undefined') {
-         localStorage.setItem('token', data.access_token);
-       }
-    }
+      // Store token in localStorage for the Bearer-header interceptor.
+      // The httpOnly cookie is also set by the server for server-side auth.
+      if (typeof window !== "undefined") {
+        localStorage.setItem("token", data.access_token);
+      }
+    },
   });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await loginMutation.mutateAsync({ username, password });
+      await loginMutation.mutateAsync({ email, password });
       toast.success("Successfully logged in");
-      router.push("/dashboard");
+      router.push("/");
     } catch (error: any) {
       toast.error(error.message || "Failed to login");
     }
@@ -53,12 +56,13 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              placeholder="admin"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="bg-background/50 border-white/10 focus:ring-primary/50 transition-all shadow-inner"
               required
             />
@@ -84,8 +88,7 @@ export default function LoginPage() {
           </Button>
           
           <div className="text-center text-sm text-muted-foreground/80 pt-4">
-            <p>Demo Credentials</p>
-            <p className="font-mono mt-1 text-foreground/80">admin / admin123</p>
+            <p>Don&apos;t have an account? Sign up to get started.</p>
           </div>
         </form>
       </div>

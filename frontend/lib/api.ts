@@ -24,6 +24,33 @@ export const fetchPipelineRuns = async (dagId: string) => (await api.get(`/pipel
 export const triggerPipeline = async (dagId: string) => (await api.post(`/pipelines/${dagId}/trigger`)).data;
 export const togglePipeline = async (dagId: string, isActive: boolean) => (await api.patch(`/pipelines/${dagId}/toggle`, { is_active: isActive })).data;
 
+export interface PipelineCreatePayload {
+  name: string;
+  source_type: string;
+  schedule: string;
+  connection_config: Record<string, string>;
+}
+
+export interface Pipeline {
+  id: number;
+  user_id: number | null;
+  name: string;
+  source_type: string;
+  schedule: string;
+  enabled: boolean;
+  dag_id: string | null;
+  created_at: string;
+}
+
+export const createPipeline = async (data: PipelineCreatePayload): Promise<Pipeline> => {
+  try {
+    return (await api.post('/pipelines', data)).data;
+  } catch (err: any) {
+    const message = err?.response?.data?.detail ?? err?.message ?? 'Failed to create pipeline';
+    throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+  }
+};
+
 // -- Metrics
 export const fetchMetricsSummary = async () => (await api.get('/metrics/summary')).data;
 export const fetchWeatherMetrics = async (dateFrom?: string, dateTo?: string) => {
@@ -44,14 +71,31 @@ export const fetchQualityScores = async () => (await api.get('/quality/scores'))
 export const fetchQualityAlerts = async () => (await api.get('/quality/alerts')).data;
 
 // -- Auth
-export const fetchToken = async (username: string, password: string) => {
-  const formData = new URLSearchParams();
-  formData.append('username', username);
-  formData.append('password', password);
-  
-  // Auth uses the root server /auth/token, not /api/auth
-  const rootUrl = API_BASE.replace('/api', '');
-  return (await axios.post(`${rootUrl}/auth/token`, formData, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+// POST /auth/login expects JSON {email, password} and returns {access_token, token_type}.
+// The auth router is mounted at /auth on the server root (no /api prefix).
+// withCredentials=true ensures the httpOnly cookie is stored by the browser.
+export const fetchToken = async (email: string, password: string) => {
+  const rootUrl = API_BASE.replace(/\/api.*$/, '');
+  return (await axios.post(`${rootUrl}/auth/login`, { email, password }, {
+    headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
   })).data;
+};
+
+export const fetchSignup = async (email: string, password: string) => {
+  const rootUrl = API_BASE.replace(/\/api.*$/, '');
+  return (await axios.post(`${rootUrl}/auth/signup`, { email, password }, {
+    headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
+  })).data;
+};
+
+export const fetchLogout = async () => {
+  const rootUrl = API_BASE.replace(/\/api.*$/, '');
+  await axios.post(`${rootUrl}/auth/logout`, {}, { withCredentials: true });
+};
+
+export const logout = async (): Promise<void> => {
+  const rootUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api.*$/, '');
+  await axios.post(`${rootUrl}/auth/logout`, {}, { withCredentials: true });
 };

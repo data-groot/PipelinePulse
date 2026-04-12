@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
 
   # ── PostgreSQL 16 ────────────────────────────────────────────
@@ -15,6 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pipelinepulse}"]
       interval: 10s
@@ -36,6 +35,7 @@ services:
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       DEBUG: "true"
+      FERNET_KEY: ${FERNET_KEY}
     ports:
       - "8000:8000"
     depends_on:
@@ -83,7 +83,7 @@ services:
 
   # ── Airflow ──────────────────────────────────────────────────
   airflow-webserver:
-    image: apache/airflow:2.9.0-python3.12
+    build: ./airflow
     container_name: pipelinepulse-airflow-web
     restart: unless-stopped
     depends_on:
@@ -93,19 +93,32 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      # Static Fernet key — safe dev default, override in production via .env
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=}
+      # Static webserver secret key — prevents session invalidation on restart
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-pipelinepulse-dev-webserver-secret}
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/pipelinepulse
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-pipelinepulse}
+      - DBT_LOG_PATH=/tmp/dbt_logs
+      - DBT_TARGET_PATH=/tmp/dbt_target
+      - FERNET_KEY=${FERNET_KEY}
     ports:
       - "8080:8080"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/requirements.txt:/opt/airflow/requirements.txt
       - ./dbt:/opt/airflow/dbt
-    command: bash -c "pip install -r /opt/airflow/requirements.txt && pip install dbt-postgres==1.8.2 && airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com && airflow webserver"
+    command:
+      - bash
+      - -c
+      - |
+        PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='airflow'" | grep -q 1 || PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -c "CREATE DATABASE airflow" &&
+        airflow db migrate &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com 2>/dev/null || true &&
+        airflow webserver
 
   airflow-scheduler:
-    image: apache/airflow:2.9.0-python3.12
+    build: ./airflow
     container_name: pipelinepulse-airflow-scheduler
     restart: unless-stopped
     depends_on:
@@ -115,12 +128,28 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/pipelinepulse
+      # Must match webserver Fernet key so encrypted values round-trip correctly
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-pipelinepulse-dev-webserver-secret}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-pipelinepulse}
+      - DBT_LOG_PATH=/tmp/dbt_logs
+      - DBT_TARGET_PATH=/tmp/dbt_target
+      - DBT_HOST=postgres
+      - DBT_USER=${POSTGRES_USER:-postgres}
+      - DBT_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DBT_DATABASE=${POSTGRES_DB:-pipelinepulse}
+      - DBT_PORT=5432
+      - FERNET_KEY=${FERNET_KEY}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/requirements.txt:/opt/airflow/requirements.txt
       - ./dbt:/opt/airflow/dbt
-    command: bash -c "pip install -r /opt/airflow/requirements.txt && pip install dbt-postgres==1.8.2 && airflow scheduler"
+    command:
+      - bash
+      - -c
+      - |
+        PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='airflow'" | grep -q 1 || PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -c "CREATE DATABASE airflow" &&
+        airflow db migrate &&
+        airflow scheduler
 
 volumes:
   postgres_data:

@@ -19,6 +19,9 @@ class PipelineRunBase(BaseModel):
 
 class PipelineConfigWithStatus(PipelineConfigBase):
     id: int
+    user_id: Optional[int] = None
+    dag_id: Optional[str] = None
+    created_at: Optional[datetime] = None
     last_run_status: Optional[str] = None
     last_run_time: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

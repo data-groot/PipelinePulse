@@ -13,8 +13,14 @@ from airflow.operators.bash import BashOperator
 fake = Faker()
 
 def get_db_connection():
-    db_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@postgres:5432/pipelinepulse")
-    db_url = db_url.replace("+asyncpg", "")
+    # Derive connection from Airflow's own DB URL (same host/user/password, different database).
+    # AIRFLOW__DATABASE__SQL_ALCHEMY_CONN is set in docker-compose with correct ${POSTGRES_PASSWORD}
+    # substitution, so it reflects the actual password even if the default "postgres" was overridden.
+    airflow_conn = os.environ.get(
+        "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN",
+        "postgresql+psycopg2://postgres:postgres@postgres:5432/airflow"
+    )
+    db_url = airflow_conn.replace("+psycopg2", "").rsplit("/", 1)[0] + "/pipelinepulse"
     return psycopg2.connect(db_url)
 
 def generate_orders(**context):
@@ -64,39 +70,42 @@ def generate_orders(**context):
 def run_quality_checks(**context):
     conn = get_db_connection()
     cur = conn.cursor()
-    dag_id = context['dag'].dag_id
     run_id = context['run_id']
-    
+
     cur.execute("SELECT COUNT(*) FROM silver.stg_orders WHERE order_id IS NULL OR user_id IS NULL")
     null_count = cur.fetchone()[0]
     pass_a = (null_count == 0)
-    
+
     cur.execute("SELECT COUNT(*) FROM silver.stg_orders WHERE amount <= 0")
     amt_count = cur.fetchone()[0]
     pass_b = (amt_count == 0)
-    
+
     cur.execute("SELECT COUNT(*) FROM silver.stg_orders WHERE status NOT IN ('completed', 'pending', 'returned')")
     stat_count = cur.fetchone()[0]
     pass_c = (stat_count == 0)
-    
+
     cur.execute("SELECT COUNT(*) FROM silver.stg_orders")
     total_count = cur.fetchone()[0]
     pass_d = (total_count >= 400)
-    
-    checks = [
-        ("null_check_order_user_id", pass_a, f"Found {null_count} null rows" if not pass_a else None),
-        ("amount_positive_check", pass_b, f"Found {amt_count} rows with amount <= 0" if not pass_b else None),
-        ("status_allowed_check", pass_c, f"Found {stat_count} rows with invalid status" if not pass_c else None),
-        ("min_row_count_check", pass_d, f"Found {total_count} rows, expected >= 400" if not pass_d else None)
-    ]
-    
+
+    # Column names match the alembic 001_initial_schema.sql definition:
+    #   table_name, check_name, passed, score, details (JSONB), run_at
+    # run_id is stored in details so it is queryable without a schema change.
     insert_sql = """
-    INSERT INTO meta.quality_runs (run_id, table_name, test_name, passed, error_message, checked_at)
-    VALUES (%s, %s, %s, %s, %s, NOW())
+    INSERT INTO meta.quality_runs (table_name, check_name, passed, score, details, run_at)
+    VALUES (%s, %s, %s, %s, %s::jsonb, NOW())
     """
-    for test_name, passed, error_msg in checks:
-        cur.execute(insert_sql, (run_id, 'stg_orders', test_name, passed, error_msg))
-        
+    checks = [
+        ("null_check_order_user_id", pass_a, null_count),
+        ("amount_positive_check",    pass_b, amt_count),
+        ("status_allowed_check",     pass_c, stat_count),
+        ("min_row_count_check",      pass_d, total_count),
+    ]
+    for check_name, passed, detail_value in checks:
+        details = json.dumps({"run_id": run_id, "count": detail_value})
+        score = 1.0 if passed else 0.0
+        cur.execute(insert_sql, ('stg_orders', check_name, passed, score, details))
+
     conn.commit()
     cur.close()
     conn.close()
@@ -107,13 +116,14 @@ def update_pipeline_run(**context):
     dag_id = context['dag'].dag_id
     run_id = context['run_id']
     rows_processed = context['ti'].xcom_pull(task_ids='generate_orders', key='rows_processed') or 0
-    
+    started_at = context['dag_run'].start_date
+
     cur.execute("""
-    INSERT INTO meta.pipeline_runs (run_id, dag_id, status, finished_at, rows_processed)
-    VALUES (%s, %s, 'success', NOW(), %s)
-    ON CONFLICT (run_id) 
-    DO UPDATE SET status = 'success', finished_at = NOW(), rows_processed = %s
-    """, (run_id, dag_id, rows_processed, rows_processed))
+    INSERT INTO meta.pipeline_runs (run_id, dag_id, status, started_at, finished_at, rows_processed)
+    VALUES (%s, %s, 'success', %s, NOW(), %s)
+    ON CONFLICT (run_id)
+    DO UPDATE SET status = 'success', started_at = EXCLUDED.started_at, finished_at = NOW(), rows_processed = %s
+    """, (run_id, dag_id, started_at, rows_processed, rows_processed))
     
     conn.commit()
     cur.close()
@@ -134,7 +144,10 @@ with DAG(
     
     task_run_dbt = BashOperator(
         task_id="run_dbt_transform",
-        bash_command="cd /opt/airflow/dbt && dbt run --select staging.stg_orders staging.stg_users marts.kpi_revenue_daily"
+        # Run the two existing staging models.  The generate_schema_name macro in
+        # dbt/macros/ ensures models land in the declared schema (silver), not
+        # the prefixed form (public_silver) that dbt uses by default.
+        bash_command="mkdir -p ${DBT_LOG_PATH:-/tmp/dbt_logs} ${DBT_TARGET_PATH:-/tmp/dbt_target} && cd /opt/airflow/dbt && dbt run --profiles-dir . --log-path ${DBT_LOG_PATH:-/tmp/dbt_logs} --target-path ${DBT_TARGET_PATH:-/tmp/dbt_target} --select stg_orders stg_users kpi_revenue_daily"
     )
     
     task_quality = PythonOperator(

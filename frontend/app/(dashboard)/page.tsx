@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
   // Metrics calculations
   const totalPipelines = pipelines?.length || 0;
-  const healthyPipelines = pipelines?.filter((p: any) => p.status === 'success' || p.status === 'running').length || 0;
+  const healthyPipelines = pipelines?.filter((p: any) => p.last_run_status === 'success' || p.last_run_status === 'running').length || 0;
   
   let avgQuality = 0;
   if (qualityScores?.length > 0) {
@@ -139,8 +139,8 @@ export default function DashboardPage() {
                 <YAxis yAxisId="right" orientation="right" />
                 <RechartsTooltip labelFormatter={(val) => format(new Date(val), 'MMM dd, yyyy')} />
                 <Legend />
-                <Line yAxisId="left" type="monotone" dataKey="gmv" stroke="#10b981" strokeWidth={2} name="Total GMV ($)" dot={false} activeDot={{ r: 8 }} />
-                <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#3b82f6" strokeWidth={2} name="Total Orders" dot={false} />
+                <Line yAxisId="left" type="monotone" dataKey="total_revenue" stroke="#10b981" strokeWidth={2} name="Total Revenue ($)" dot={false} activeDot={{ r: 8 }} />
+                <Line yAxisId="right" type="monotone" dataKey="successful_orders" stroke="#3b82f6" strokeWidth={2} name="Successful Orders" dot={false} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -171,7 +171,7 @@ export default function DashboardPage() {
                       <CardTitle className="text-base">{pipe.name}</CardTitle>
                       <CardDescription className="text-xs mt-1">{pipe.schedule}</CardDescription>
                     </div>
-                    {getStatusBadge(pipe.enabled ? 'success' : 'never run')}
+                    {getStatusBadge(pipe.last_run_status || 'never run')}
                   </CardHeader>
                   <CardContent className="p-4 pt-0 text-sm grid grid-cols-2 gap-2 text-muted-foreground">
                     <div>
