@@ -1,39 +1,50 @@
-.PHONY: up down restart logs build db-reset seed dbt-run web api
+# Auto-detect docker compose command
+DOCKER_COMPOSE := $(shell docker compose version > /dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
 
-up:
-	docker-compose up -d
+.DEFAULT_GOAL := start
 
-down:
-	docker-compose down
+.PHONY: start stop restart reset logs logs-backend logs-frontend logs-airflow shell-backend shell-db ps build
+
+start:
+	@chmod +x start.sh
+	@./start.sh
+
+stop:
+	@echo "Stopping all services..."
+	@$(DOCKER_COMPOSE) down
 
 restart:
-	docker-compose restart
+	@$(MAKE) stop
+	@$(MAKE) start
+
+reset:
+	@echo "⚠️  WARNING: This will remove all containers, volumes, and the .env file!"
+	@echo "⚠️  All data will be lost. Press Ctrl+C to cancel or Enter to continue..."
+	@read -r
+	@$(DOCKER_COMPOSE) down -v --remove-orphans
+	@rm -f .env
+	@echo "✓ Reset complete"
 
 logs:
-	docker-compose logs -f
+	@$(DOCKER_COMPOSE) logs -f
+
+logs-backend:
+	@$(DOCKER_COMPOSE) logs -f backend
+
+logs-frontend:
+	@$(DOCKER_COMPOSE) logs -f frontend
+
+logs-airflow:
+	@$(DOCKER_COMPOSE) logs -f airflow-scheduler
+
+shell-backend:
+	@$(DOCKER_COMPOSE) exec backend bash
+
+shell-db:
+	@$(DOCKER_COMPOSE) exec postgres psql -U pp_user -d pipelinepulse
+
+ps:
+	@$(DOCKER_COMPOSE) ps
 
 build:
-	docker-compose build
-
-db-reset:
-	docker-compose down -v
-	docker-compose up -d postgres backend
-	@echo "Waiting for postgres to initialize..."
-	sleep 5
-	docker-compose restart backend
-
-dbt-run:
-	docker-compose run --rm dbt-runner dbt run
-
-dbt-test:
-	docker-compose run --rm dbt-runner dbt test
-
-# Easy commands for booting
-api:
-	docker-compose up -d backend
-
-web:
-	docker-compose up -d frontend
-
-airflow:
-	docker-compose up -d airflow-webserver airflow-scheduler
+	@$(DOCKER_COMPOSE) build --no-cache

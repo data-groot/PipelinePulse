@@ -37,3 +37,11 @@ dbt/logs/
 
 # Airflow
 airflow/logs/
+.env
+__pycache__/
+*.pyc
+cookies.txt
+backend_logs.txt
+dbt/logs/
+dbt/target/
+__pycache__/

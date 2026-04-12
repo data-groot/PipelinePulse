@@ -34,11 +34,11 @@ export function usePipelineRunFeed() {
           const rawData = JSON.parse(event.data);
           if (Array.isArray(rawData)) {
             const mapped = rawData.map((r: any) => ({
-              run_id: r.id,
+              run_id: r.run_id,
               pipeline: r.dag_id,
               status: r.status,
-              started: r.start_time,
-              duration: r.end_time && r.start_time ? Math.round((new Date(r.end_time).getTime() - new Date(r.start_time).getTime())/1000) : 0,
+              started: r.started_at,
+              duration: r.finished_at && r.started_at ? Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime())/1000) : 0,
               rows: r.rows_processed || 0
             }));
             setEvents(mapped);

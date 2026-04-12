@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchPipelines, fetchPipelineRuns, triggerPipeline, togglePipeline, fetchToken } from '@/lib/api';
+import { CreatePipelineDialog } from '@/components/CreatePipelineDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ export default function PipelinesPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const { data: pipelines, isLoading: loadingPipelines } = useQuery({
+  const { data: pipelines, refetch: refetchPipelines } = useQuery({
     queryKey: ['pipelines'],
     queryFn: fetchPipelines,
   });
@@ -51,7 +52,7 @@ export default function PipelinesPage() {
       toast(isActive ? 'Pipeline enabled' : 'Pipeline disabled');
       return { previous };
     },
-    onError: (err, newTodo, context: any) => {
+    onError: (_err, _vars, context: any) => {
       queryClient.setQueryData(['pipelines'], context.previous);
       toast.error('Failed to toggle pipeline');
     },
@@ -99,13 +100,6 @@ export default function PipelinesPage() {
     }
   };
 
-  const getSourceType = (dagId: string) => {
-    if (dagId.includes('weather')) return 'REST API';
-    if (dagId.includes('order')) return 'PostgreSQL';
-    if (dagId.includes('github')) return 'GraphQL';
-    return 'Unknown';
-  };
-
   const getDescription = (dagId: string) => {
     if (dagId.includes('weather')) return 'WeatherFlow - Ingests hourly meteorological forecasts.';
     if (dagId.includes('order')) return 'OrderStream - Migrates transactional e-commerce data.';
@@ -122,9 +116,12 @@ export default function PipelinesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Pipelines</h1>
-        <p className="text-muted-foreground">Manage and orchestrate your Airflow ingestion workflows.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Pipelines</h1>
+          <p className="text-muted-foreground">Manage and orchestrate your Airflow ingestion workflows.</p>
+        </div>
+        <CreatePipelineDialog onSuccess={refetchPipelines} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -136,7 +133,7 @@ export default function PipelinesPage() {
                 <div>
                   <CardTitle className="text-lg">{pipe.name}</CardTitle>
                   <CardDescription className="mt-1 flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] uppercase font-mono">{getSourceType(pipe.name)}</Badge>
+                    <Badge variant="outline" className="text-[10px] uppercase font-mono">{pipe.source_type}</Badge>
                     <span className="font-mono text-xs">{pipe.schedule}</span>
                   </CardDescription>
                 </div>

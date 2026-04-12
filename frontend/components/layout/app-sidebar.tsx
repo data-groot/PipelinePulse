@@ -1,11 +1,12 @@
 "use client";
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchPipelines } from "@/lib/api";
-import { Activity, LayoutDashboard, ListTree, Database, ShieldCheck } from "lucide-react";
+import { fetchPipelines, logout, api } from "@/lib/api";
+import { Activity, LayoutDashboard, ListTree, Database, ShieldCheck, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -16,11 +17,29 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get('/auth/me')
+      .then((res) => setUserEmail(res.data?.email ?? null))
+      .catch(() => setUserEmail(null));
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // proceed with local cleanup regardless of server response
+    }
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
+
   const { data: pipelines } = useQuery({
     queryKey: ['pipelines'],
     queryFn: fetchPipelines,
@@ -88,6 +107,20 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
+
+      <SidebarFooter className="p-4 border-t border-sidebar-border">
+        {userEmail && (
+          <p className="text-xs text-muted-foreground truncate mb-2">{userEmail}</p>
+        )}
+        <SidebarMenuButton
+          onClick={handleLogout}
+          className="cursor-pointer w-full justify-start gap-2 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-all"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Log out</span>
+        </SidebarMenuButton>
+      </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   );

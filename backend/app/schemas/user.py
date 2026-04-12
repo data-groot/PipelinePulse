@@ -28,3 +28,13 @@ class TokenOut(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class EmailLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
