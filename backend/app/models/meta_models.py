@@ -7,6 +7,7 @@ class PipelineConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    dag_id = Column(String, nullable=True)   # Airflow DAG ID; nullable until backfilled
     source_type = Column(String, nullable=False)
     schedule = Column(String, nullable=False)
     enabled = Column(Boolean, server_default=text("true"))

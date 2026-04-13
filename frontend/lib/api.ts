@@ -1,139 +1,101 @@
-"use client";
+import axios from 'axios';
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+// Get base URL from env or use fallback
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const api = axios.create({
+  baseURL: API_BASE,
+});
 
-// In a real app we'd store the token in httpOnly cookie or secure storage,
-// For this demo we'll use localStorage, but we need to ensure it's client-side only.
-export function getToken() {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("pp_token");
-  }
-  return null;
-}
-
-export function setToken(token: string) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("pp_token", token);
-  }
-}
-
-export function removeToken() {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("pp_token");
-  }
-}
-
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  const token = getToken();
-  const headers = {
-    ...options.headers,
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-
-  const response = await fetch(`${API_BASE}${url}`, { ...options, headers });
-  
-  if (!response.ok) {
-    if (response.status === 401) {
-      removeToken();
-      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
+// Configure interceptor to inject JWT token if available
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `Error: ${response.status}`);
   }
-  
-  return response.json();
+  return config;
+});
+
+// -- Pipelines
+export const fetchPipelines = async () => (await api.get('/pipelines')).data;
+export const fetchPipelineRuns = async (dagId: string) => (await api.get(`/pipelines/${dagId}/runs`)).data;
+export const triggerPipeline = async (dagId: string) => (await api.post(`/pipelines/${dagId}/trigger`)).data;
+export const togglePipeline = async (dagId: string, isActive: boolean) => (await api.patch(`/pipelines/${dagId}/toggle`, { is_active: isActive })).data;
+
+export interface PipelineCreatePayload {
+  name: string;
+  source_type: string;
+  schedule: string;
+  connection_config: Record<string, string>;
 }
 
-// ── Auth ───────────────────────────────────────────────────────
+export interface Pipeline {
+  id: number;
+  user_id: number | null;
+  name: string;
+  source_type: string;
+  schedule: string;
+  enabled: boolean;
+  dag_id: string | null;
+  created_at: string;
+}
 
-export const useLogin = () => {
-  return useMutation({
-    mutationFn: async (credentials: any) => {
-      const data = await fetchWithAuth("/api/v1/auth/login", {
-        method: "POST",
-        body: JSON.stringify(credentials),
-      });
-      setToken(data.access_token);
-      return data;
-    },
-  });
+export const createPipeline = async (data: PipelineCreatePayload): Promise<Pipeline> => {
+  try {
+    return (await api.post('/pipelines', data)).data;
+  } catch (err: any) {
+    const message = err?.response?.data?.detail ?? err?.message ?? 'Failed to create pipeline';
+    throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+  }
 };
 
-export const useMe = () => {
-  return useQuery({
-    queryKey: ["me"],
-    queryFn: () => fetchWithAuth("/api/v1/auth/me"),
-    retry: false,
-  });
+// -- Metrics
+export const fetchMetricsSummary = async () => (await api.get('/metrics/summary')).data;
+export const fetchWeatherMetrics = async (dateFrom?: string, dateTo?: string) => {
+  const params = new URLSearchParams();
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+  return (await api.get(`/metrics/weather?${params.toString()}`)).data;
+};
+export const fetchRevenueMetrics = async (dateFrom?: string, dateTo?: string) => {
+  const params = new URLSearchParams();
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+  return (await api.get(`/metrics/revenue?${params.toString()}`)).data;
 };
 
-// ── Pipelines ──────────────────────────────────────────────────
+// -- Quality
+export const fetchQualityScores = async () => (await api.get('/quality/scores')).data;
+export const fetchQualityAlerts = async () => (await api.get('/quality/alerts')).data;
 
-export const usePipelines = () => {
-  return useQuery({
-    queryKey: ["pipelines"],
-    queryFn: () => fetchWithAuth("/api/v1/pipelines"),
-  });
+// -- Auth
+// POST /auth/login expects JSON {email, password} and returns {access_token, token_type}.
+// The auth router is mounted at /auth on the server root (no /api prefix).
+// withCredentials=true ensures the httpOnly cookie is stored by the browser.
+export const fetchToken = async (email: string, password: string) => {
+  const rootUrl = API_BASE.replace(/\/api.*$/, '');
+  return (await axios.post(`${rootUrl}/auth/login`, { email, password }, {
+    headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
+  })).data;
 };
 
-export const usePipeline = (id: number) => {
-  return useQuery({
-    queryKey: ["pipelines", id],
-    queryFn: () => fetchWithAuth(`/api/v1/pipelines/${id}`),
-    enabled: !!id,
-  });
+export const fetchSignup = async (email: string, password: string) => {
+  const rootUrl = API_BASE.replace(/\/api.*$/, '');
+  return (await axios.post(`${rootUrl}/auth/signup`, { email, password }, {
+    headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
+  })).data;
 };
 
-export const useTogglePipeline = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) =>
-      fetchWithAuth(`/api/v1/pipelines/${id}`, { method: "PATCH" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pipelines"] });
-    },
-  });
+export const fetchLogout = async () => {
+  const rootUrl = API_BASE.replace(/\/api.*$/, '');
+  await axios.post(`${rootUrl}/auth/logout`, {}, { withCredentials: true });
 };
 
-// ── Runs ───────────────────────────────────────────────────────
-
-export const useRuns = (params?: { dag_id?: string; status?: string; limit?: number }) => {
-  return useQuery({
-    queryKey: ["runs", params],
-    queryFn: () => {
-      const search = new URLSearchParams();
-      if (params?.dag_id) search.append("dag_id", params.dag_id);
-      if (params?.status) search.append("status", params.status);
-      if (params?.limit) search.append("limit", params.limit.toString());
-      return fetchWithAuth(`/api/v1/runs?${search.toString()}`);
-    },
-  });
-};
-
-export const useRun = (runId: string) => {
-  return useQuery({
-    queryKey: ["runs", runId],
-    queryFn: () => fetchWithAuth(`/api/v1/runs/${runId}`),
-    enabled: !!runId,
-  });
-};
-
-// ── Quality ────────────────────────────────────────────────────
-
-export const useQualityRuns = (params?: { table_name?: string; passed?: boolean; limit?: number }) => {
-  return useQuery({
-    queryKey: ["quality", params],
-    queryFn: () => {
-      const search = new URLSearchParams();
-      if (params?.table_name) search.append("table_name", params.table_name);
-      if (params?.passed !== undefined) search.append("passed", params.passed.toString());
-      if (params?.limit) search.append("limit", params.limit.toString());
-      return fetchWithAuth(`/api/v1/quality?${search.toString()}`);
-    },
-  });
+export const logout = async (): Promise<void> => {
+  const rootUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api.*$/, '');
+  await axios.post(`${rootUrl}/auth/logout`, {}, { withCredentials: true });
 };

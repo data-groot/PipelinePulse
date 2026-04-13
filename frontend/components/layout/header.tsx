@@ -12,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { removeToken } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
@@ -22,7 +21,9 @@ export function TopHeader() {
   const { theme, setTheme } = useTheme();
 
   const handleLogout = () => {
-    removeToken();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+    }
     router.push("/login");
   };
 

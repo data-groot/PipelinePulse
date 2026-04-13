@@ -1,39 +1,76 @@
 # PipelinePulse 🚀
 
-PipelinePulse is an end-to-end ETL Observability platform showcasing a modern data stack. It integrates synthetic data generation, API consumption, transformation, and real-time frontend visualization.
+PipelinePulse is an end-to-end modern **ETL Observability Platform**. This system runs automated data ingestion pipelines (using Apache Airflow), processes transformations through a multi-layer Medallion architecture (bronze/silver/gold using `dbt`), and serves real-time observability metrics via a Next.js Dashboard and FastAPI backend.
 
-## Architecture & Tech Stack
+---
 
-- **Frontend:** Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui
-- **Backend:** FastAPI (Python 3.12), SQLAlchemy, Pydantic, WebSockets
-- **Database:** PostgreSQL 16
-- **Data Transformation:** dbt-core (Medallion Architecture: Bronze, Silver, Gold)
-- **Orchestration:** Apache Airflow 2.9
-- **Infrastructure:** Docker Compose (Local Dev) / Kubernetes (Production)
+## 🏗️ Architecture Stack
 
-## Getting Started (Local Development)
+- **Orchestration:** Apache Airflow
+- **Data Warehouse:** PostgreSQL (Medallion Architecture)
+- **Transformations:** dbt (Data Build Tool) core
+- **Backend API:** FastAPI (Python) + WebSockets
+- **Frontend UI:** Next.js 15, React Query, Recharts, shadcn/ui
+- **Deployment:** Docker Compose (with Kubernetes manifests ready for production)
+
+---
+
+## 🛠️ Local Setup & Quickstart
+
+Everything is fully containerized with Docker, making local setup incredibly easy.
 
 ### 1. Prerequisites
-- Docker & Docker Compose
-- Node.js (Optional if running outside container)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+- Git installed.
 
-### 2. Boot Cluster
+### 2. Environment Variables
+Copy the example environment securely.
 ```bash
-docker-compose up -d postgres backend frontend
+cp .env.example .env
 ```
 
-### 3. Initialize Orchestrator
-Airflow has been natively configured into the docker-compose cluster. To start scheduling pipelines:
+### 3. Start the Cluster
+Use Docker Compose to build and start all 5 servers (Postgres, Airflow Web, Airflow Scheduler, FastAPI Backend, and Next.js Frontend).
 ```bash
-docker-compose up -d airflow-webserver airflow-scheduler
+docker-compose up -d
 ```
-* Access Airflow: `http://localhost:8080` (admin/admin)
-* Access Dashboard: `http://localhost:3000`
-* Access API Docs: `http://localhost:8000/docs`
+*(Note: On the first run, this may take a few minutes as it compiles the Next.js app and pulls down the heavy Airflow/Postgres images).*
 
-### 4. Running dbt Manually
+### 4. Run Data Transformations (dbt)
+The Airflow DAGs will automatically start populating the raw "Bronze" layer in PostgreSQL. You can manually run your dbt transformations to aggregate those tables into the Silver and Gold analytics layers:
+
 ```bash
-# Triggers the dbt container explicitly 
-docker-compose run --rm dbt-runner dbt debug
-docker-compose run --rm dbt-runner dbt run
+# Run data transformations
+docker-compose run --rm dbt-runner run
+
+# Run quality integrity tests
+docker-compose run --rm dbt-runner test
+```
+
+---
+
+## 🌐 Navigating the Platform
+
+Once the cluster is running, the following services are available natively on your `localhost`:
+
+- **Observability Dashboard (Next.js):** [http://localhost:3000](http://localhost:3000)
+    - *Features real-time WebSocket logs, Pipeline trigger toggles, and Data Quality scorecards.*
+- **Airflow Web UI:** [http://localhost:8080](http://localhost:8080)
+    - *Username/Password: admin / admin*
+- **FastAPI OpenAPI Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **PostgreSQL Database:** `localhost:5432` 
+
+---
+
+## 🧹 Shutting Down
+
+To gracefully pause the containers without losing your data:
+```bash
+docker-compose stop
+```
+*(You can resume exactly where you left off by running `docker-compose start` later).*
+
+To completely destroy the containers (your Postgres records remain securely cached in Docker volumes):
+```bash
+docker-compose down
 ```

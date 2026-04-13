@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: kpi_revenue_daily
+    columns:
+      - name: order_date
+        tests:
+          - not_null
+      - name: total_revenue
+        tests:
+          - not_null

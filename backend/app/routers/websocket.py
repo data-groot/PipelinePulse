@@ -52,11 +52,15 @@ manager = ConnectionManager()
 async def websocket_pipeline_runs(websocket: WebSocket):
     await manager.connect(websocket)
     
-    async with AsyncSessionLocal() as db:
-        res = await db.execute(select(PipelineRun).order_by(PipelineRun.started_at.desc()).limit(10))
-        runs = res.scalars().all()
-        schemas = [PipelineRunSchema.model_validate(r).model_dump_json() for r in runs]
-        await websocket.send_text(f"[{','.join(schemas)}]")
+    try:
+        async with AsyncSessionLocal() as db:
+            res = await db.execute(select(PipelineRun).order_by(PipelineRun.started_at.desc()).limit(10))
+            runs = res.scalars().all()
+            if runs:
+                schemas = [PipelineRunSchema.model_validate(r).model_dump_json() for r in runs]
+                await websocket.send_text(f"[{','.join(schemas)}]")
+    except Exception:
+        pass
 
     try:
         while True:

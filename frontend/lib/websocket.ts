@@ -1,59 +1,77 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from 'react';
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+export interface RunEvent {
+  pipeline: string;
+  status: string;
+  started: string;
+  duration: number;
+  rows: number;
+}
 
-type StreamStatus = "connecting" | "connected" | "disconnected" | "error";
-
-export function useRunStream(runId: string = "*") {
-  const [status, setStatus] = useState<StreamStatus>("disconnected");
-  const wsRef = useRef<WebSocket | null>(null);
-  const queryClient = useQueryClient();
+export function usePipelineRunFeed() {
+  const [events, setEvents] = useState<RunEvent[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (!runId) return;
+    let ws: WebSocket;
+    let reconnectTimeout: NodeJS.Timeout;
+    let attempt = 0;
 
-    // Connect
-    const url = `${WS_BASE}/ws/runs/${runId}`;
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
-    setStatus("connecting");
+    const connect = () => {
+      const wsBase = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+      const wsUrl = `${wsBase.replace(/\/$/, '')}/ws/pipeline-runs`;
+      ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => setStatus("connected");
-    
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.event === "run_updated" || data.event === "run_created") {
-          // Immediately refetch queries referencing this run or the general runs list
-          queryClient.invalidateQueries({ queryKey: ["runs"] });
+      ws.onopen = () => {
+        setIsConnected(true);
+        attempt = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const rawData = JSON.parse(event.data);
+          if (Array.isArray(rawData)) {
+            const mapped = rawData.map((r: any) => ({
+              run_id: r.run_id,
+              pipeline: r.dag_id,
+              status: r.status,
+              started: r.started_at,
+              duration: r.finished_at && r.started_at ? Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime())/1000) : 0,
+              rows: r.rows_processed || 0
+            }));
+            setEvents(mapped);
+          }
+        } catch (e) {
+          console.error("Failed to parse message", e);
         }
-      } catch (err) {
-        console.error("WebSocket message parse error", err);
-      }
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        const backoff = Math.min(1000 * Math.pow(2, attempt), 30000);
+        attempt++;
+        reconnectTimeout = setTimeout(connect, backoff);
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error", err);
+        ws.close();
+      };
     };
 
-    ws.onerror = () => setStatus("error");
-    
-    ws.onclose = () => setStatus("disconnected");
+    connect();
 
-    // Cleanup
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
+      clearTimeout(reconnectTimeout);
+      if (ws) {
+        // Clear onclose so it doesn't try to reconnect when unmounted 
+        ws.onclose = null;
         ws.close();
       }
-      wsRef.current = null;
     };
-  }, [runId, queryClient]);
+  }, []);
 
-  // Provide a function to send pings/acks
-  const sendMessage = (msg: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(typeof msg === "string" ? msg : JSON.stringify(msg));
-    }
-  };
-
-  return { status, sendMessage };
+  return { events, isConnected };
 }
