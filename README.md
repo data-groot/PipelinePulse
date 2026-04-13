@@ -152,10 +152,3 @@ Week 3-4:
 - [ ] Kubernetes deployment — Helm chart for production multi-tenant hosting
 - [ ] GitHub Actions CI/CD — build, test, and deploy on push to main
 
----
-
-## Built By
-
-**Mihir Tatavarthi** — CS Graduate Student at UMBC
-
-Built with [Claude Code](https://claude.ai/code), Cursor Pro, and Claude Pro.
