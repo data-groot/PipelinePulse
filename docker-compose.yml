@@ -36,6 +36,9 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       DEBUG: "true"
       FERNET_KEY: ${FERNET_KEY}
+      AIRFLOW_URL: http://airflow-webserver:8080/api/v1
+      AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-admin}
+      AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
     ports:
       - "8000:8000"
     depends_on:
@@ -44,10 +47,10 @@ services:
     volumes:
       - ./backend:/app
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ── Next.js Frontend ─────────────────────────────────────────
   frontend:
@@ -97,6 +100,8 @@ services:
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=}
       # Static webserver secret key — prevents session invalidation on restart
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-pipelinepulse-dev-webserver-secret}
+      # Enable basic auth for the REST API so the backend can trigger DAGs programmatically
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-pipelinepulse}
