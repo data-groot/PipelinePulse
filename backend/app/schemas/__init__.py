@@ -24,6 +24,7 @@ class PipelineConfigWithStatus(PipelineConfigBase):
     created_at: Optional[datetime] = None
     last_run_status: Optional[str] = None
     last_run_time: Optional[datetime] = None
+    rows_processed: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
 class PipelineRun(PipelineRunBase):

@@ -51,6 +51,45 @@ export const createPipeline = async (data: PipelineCreatePayload): Promise<Pipel
   }
 };
 
+export interface PipelinePreview {
+  pipeline_name: string;
+  rows: Record<string, unknown>[];
+  total_count: number;
+  last_synced: string | null;
+}
+
+export const fetchPipelinePreview = async (pipelineId: number): Promise<PipelinePreview> =>
+  (await api.get(`/pipelines/${pipelineId}/preview`)).data;
+
+export interface SampleLoadResponse {
+  pipeline_id: number;
+  dag_id: string;
+  name: string;
+  status: string;
+  message: string;
+}
+
+export const loadSampleData = async (): Promise<SampleLoadResponse> =>
+  (await api.post('/pipelines/samples/load')).data;
+
+export const loadSamplePipeline = async (): Promise<Pipeline> => {
+  try {
+    return (await api.post('/pipelines/sample')).data;
+  } catch (err: any) {
+    const message = err?.response?.data?.detail ?? err?.message ?? 'Failed to create sample pipeline';
+    throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+  }
+};
+
+export interface AvgQualityResponse {
+  avg_score_pct: number;
+  pipeline_count: number;
+  check_count: number;
+}
+
+export const fetchAvgQuality = async (): Promise<AvgQualityResponse> =>
+  (await api.get('/quality/avg')).data;
+
 // -- Metrics
 export const fetchMetricsSummary = async () => (await api.get('/metrics/summary')).data;
 export const fetchWeatherMetrics = async (dateFrom?: string, dateTo?: string) => {

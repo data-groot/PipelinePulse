@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export interface RunEvent {
+  run_id: string;
   pipeline: string;
   status: string;
   started: string;
@@ -10,9 +11,23 @@ export interface RunEvent {
   rows: number;
 }
 
-export function usePipelineRunFeed() {
+/**
+ * Subscribe to the pipeline run WebSocket feed.
+ *
+ * @param dagIdToName  Optional map from dag_id → human pipeline name.
+ *                     When provided, raw dag_id values in events are replaced
+ *                     with the user-friendly name (e.g. "json_placeholder_dag"
+ *                     becomes "JSON Placeholder Test").
+ */
+export function usePipelineRunFeed(dagIdToName?: Record<string, string>) {
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  // Keep a ref so the message handler always sees the latest map without
+  // needing to re-subscribe the WebSocket when the map changes.
+  const lookupRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    lookupRef.current = dagIdToName ?? {};
+  }, [dagIdToName]);
 
   useEffect(() => {
     let ws: WebSocket;
@@ -33,18 +48,27 @@ export function usePipelineRunFeed() {
         try {
           const rawData = JSON.parse(event.data);
           if (Array.isArray(rawData)) {
+            const lookup = lookupRef.current;
             const mapped = rawData.map((r: any) => ({
               run_id: r.run_id,
-              pipeline: r.dag_id,
+              // Resolve dag_id to human name when the lookup map is available
+              pipeline: lookup[r.dag_id] ?? r.dag_id,
               status: r.status,
               started: r.started_at,
-              duration: r.finished_at && r.started_at ? Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime())/1000) : 0,
-              rows: r.rows_processed || 0
+              duration:
+                r.finished_at && r.started_at
+                  ? Math.round(
+                      (new Date(r.finished_at).getTime() -
+                        new Date(r.started_at).getTime()) /
+                        1000
+                    )
+                  : 0,
+              rows: r.rows_processed || 0,
             }));
             setEvents(mapped);
           }
         } catch (e) {
-          console.error("Failed to parse message", e);
+          console.error('Failed to parse WebSocket message', e);
         }
       };
 
@@ -56,7 +80,7 @@ export function usePipelineRunFeed() {
       };
 
       ws.onerror = (err) => {
-        console.error("WebSocket error", err);
+        console.error('WebSocket error', err);
         ws.close();
       };
     };
@@ -66,7 +90,7 @@ export function usePipelineRunFeed() {
     return () => {
       clearTimeout(reconnectTimeout);
       if (ws) {
-        // Clear onclose so it doesn't try to reconnect when unmounted 
+        // Clear onclose so it doesn't try to reconnect when unmounted
         ws.onclose = null;
         ws.close();
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { createPipeline, PipelineCreatePayload } from "@/lib/api";
 import {
@@ -15,10 +15,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MAX_CSV_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type SourceType = "rest_api" | "postgresql" | "csv";
+
+interface CsvFileState {
+  file: File;
+  rowCount: number;
+}
 
 interface ScheduleOption {
   label: string;
@@ -45,6 +56,8 @@ interface FormState {
   database: string;
   db_username: string;
   db_password: string;
+  pg_query: string;
+  pg_table: string;
 }
 
 const INITIAL_FORM: FormState = {
@@ -58,6 +71,8 @@ const INITIAL_FORM: FormState = {
   database: "",
   db_username: "",
   db_password: "",
+  pg_query: "",
+  pg_table: "",
 };
 
 // ---------------------------------------------------------------------------
@@ -69,13 +84,16 @@ function buildConnectionConfig(form: FormState): Record<string, string> {
     return { url: form.url, api_key: form.api_key };
   }
   if (form.source_type === "postgresql") {
-    return {
+    const config: Record<string, string> = {
       host: form.host,
       port: form.port,
       database: form.database,
       username: form.db_username,
       password: form.db_password,
     };
+    if (form.pg_query.trim()) config.query = form.pg_query.trim();
+    if (form.pg_table.trim()) config.table = form.pg_table.trim();
+    return config;
   }
   // csv — no connection config required
   return {};
@@ -94,11 +112,55 @@ export function CreatePipelineDialog({ onSuccess }: Props) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // CSV upload state
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [csvFile, setCsvFile] = useState<CsvFileState | null>(null);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<
+    "idle" | "uploading" | "done" | "error"
+  >("idle");
+  const [uploadResult, setUploadResult] = useState<{
+    filename: string;
+    rows: number;
+  } | null>(null);
+
   const mutation = useMutation({
     mutationFn: (payload: PipelineCreatePayload) => createPipeline(payload),
-    onSuccess: () => {
+    onSuccess: async (created) => {
+      // If CSV source, upload the file now that we have a pipeline id
+      if (form.source_type === "csv" && csvFile) {
+        setUploadStatus("uploading");
+        try {
+          const formData = new FormData();
+          formData.append("file", csvFile.file);
+          const resp = await fetch(
+            `/api/pipelines/${created.id}/upload`,
+            { method: "POST", body: formData }
+          );
+          if (!resp.ok) {
+            const body = await resp.json().catch(() => ({}));
+            throw new Error(body?.detail ?? `Upload failed (${resp.status})`);
+          }
+          const result = await resp.json();
+          setUploadResult({ filename: result.filename, rows: result.rows });
+          setUploadStatus("done");
+          // Brief pause so the user sees the success message before dialog closes
+          await new Promise((r) => setTimeout(r, 1200));
+        } catch (err: unknown) {
+          setUploadStatus("error");
+          setErrorMessage(
+            err instanceof Error ? err.message : "File upload failed."
+          );
+          return; // Do not close dialog — let the user see the error
+        }
+      }
+
       setOpen(false);
       setForm(INITIAL_FORM);
+      setCsvFile(null);
+      setCsvError(null);
+      setUploadStatus("idle");
+      setUploadResult(null);
       setErrorMessage(null);
       onSuccess();
     },
@@ -115,11 +177,61 @@ export function CreatePipelineDialog({ onSuccess }: Props) {
     if (errorMessage) setErrorMessage(null);
   }
 
+  // Count rows client-side using FileReader + csv splitting
+  async function countCsvRows(file: File): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = (e.target?.result as string) ?? "";
+        // Split on newlines; first line is header
+        const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
+        resolve(Math.max(0, lines.length - 1));
+      };
+      reader.onerror = () => reject(new Error("Could not read file"));
+      reader.readAsText(file);
+    });
+  }
+
+  async function handleCsvSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    setCsvError(null);
+    setCsvFile(null);
+    setUploadStatus("idle");
+    setUploadResult(null);
+
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setCsvError("Only .csv files are accepted.");
+      return;
+    }
+    if (file.size > MAX_CSV_BYTES) {
+      setCsvError("File exceeds the 10 MB limit.");
+      return;
+    }
+
+    try {
+      const rowCount = await countCsvRows(file);
+      if (rowCount === 0) {
+        setCsvError("CSV file must contain at least one data row.");
+        return;
+      }
+      setCsvFile({ file, rowCount });
+    } catch {
+      setCsvError("Could not read the file.");
+    }
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!form.name.trim()) {
       setErrorMessage("Pipeline name is required.");
+      return;
+    }
+
+    if (form.source_type === "csv" && !csvFile) {
+      setErrorMessage("Please select a CSV file to upload.");
       return;
     }
 
@@ -138,11 +250,15 @@ export function CreatePipelineDialog({ onSuccess }: Props) {
     if (!next) {
       setForm(INITIAL_FORM);
       setErrorMessage(null);
+      setCsvFile(null);
+      setCsvError(null);
+      setUploadStatus("idle");
+      setUploadResult(null);
     }
     setOpen(next);
   }
 
-  const isSubmitting = mutation.isPending;
+  const isSubmitting = mutation.isPending || uploadStatus === "uploading";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -298,14 +414,116 @@ export function CreatePipelineDialog({ onSuccess }: Props) {
                   disabled={isSubmitting}
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pg-query">
+                  Custom Query{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional — leave blank to use table name)
+                  </span>
+                </Label>
+                <textarea
+                  id="pg-query"
+                  rows={3}
+                  value={form.pg_query}
+                  onChange={(e) => handleChange("pg_query", e.target.value)}
+                  placeholder="SELECT * FROM orders LIMIT 1000"
+                  disabled={isSubmitting}
+                  className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 resize-none dark:bg-input/30"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pg-table">
+                  Table Name{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional — used if no custom query)
+                  </span>
+                </Label>
+                <Input
+                  id="pg-table"
+                  value={form.pg_table}
+                  onChange={(e) => handleChange("pg_table", e.target.value)}
+                  placeholder="orders"
+                  disabled={isSubmitting}
+                />
+              </div>
             </fieldset>
           )}
 
           {/* Connection Config — CSV */}
           {form.source_type === "csv" && (
-            <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-              No connection required. Upload your CSV file via the API after the pipeline is created.
-            </p>
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                CSV File
+              </legend>
+
+              {/* Hidden native file input */}
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleCsvSelect}
+                disabled={isSubmitting}
+              />
+
+              {/* Click-to-select area */}
+              {!csvFile && (
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => csvInputRef.current?.click()}
+                  className="w-full rounded-lg border border-dashed border-input bg-muted/20 px-4 py-5 text-sm text-muted-foreground hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+                >
+                  Click to select a .csv file (max 10 MB)
+                </button>
+              )}
+
+              {/* File chosen — preview */}
+              {csvFile && uploadStatus !== "done" && (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium truncate max-w-[220px]">
+                      {csvFile.file.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {csvFile.rowCount} rows previewed
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCsvFile(null);
+                      if (csvInputRef.current) csvInputRef.current.value = "";
+                    }}
+                    disabled={isSubmitting}
+                    className="ml-3 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              {/* Uploading indicator */}
+              {uploadStatus === "uploading" && (
+                <p className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  Uploading file...
+                </p>
+              )}
+
+              {/* Upload success */}
+              {uploadStatus === "done" && uploadResult && (
+                <p className="rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">
+                  File uploaded — {uploadResult.rows} rows ready to ingest
+                </p>
+              )}
+
+              {/* File-selection error */}
+              {csvError && (
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {csvError}
+                </p>
+              )}
+            </fieldset>
           )}
 
           {/* Inline error */}
@@ -327,7 +545,11 @@ export function CreatePipelineDialog({ onSuccess }: Props) {
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Pipeline"}
+              {uploadStatus === "uploading"
+                ? "Uploading..."
+                : mutation.isPending
+                ? "Creating..."
+                : "Create Pipeline"}
             </Button>
           </div>
         </form>

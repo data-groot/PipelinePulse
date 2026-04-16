@@ -19,6 +19,7 @@ import csv
 from datetime import datetime, timedelta
 
 import psycopg2
+import httpx
 from cryptography.fernet import Fernet, InvalidToken
 
 from airflow import DAG
@@ -108,78 +109,267 @@ def _make_extract(pipeline_id: int, user_id: int, source_type: str, raw_config: 
             table  = f"raw_{source_type}"
 
             # Ensure the bronze table exists for this pipeline's source type.
-            cur.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {schema}.{table} (
-                    id         BIGSERIAL PRIMARY KEY,
-                    payload    JSONB NOT NULL,
-                    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-            conn.commit()
-
+            # Each source_type branch creates its own table with the right schema.
             if source_type == "rest_api":
-                import urllib.request
+                cur.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {schema}.{table} (
+                        id          SERIAL PRIMARY KEY,
+                        pipeline_id INTEGER,
+                        payload     JSONB,
+                        ingested_at TIMESTAMP DEFAULT NOW()
+                    )
+                    """
+                )
+                conn.commit()
+
                 url     = config.get("url", "")
                 api_key = config.get("api_key", "")
                 if not url:
                     raise ValueError("rest_api pipeline is missing 'url' in connection_config")
-                req = urllib.request.Request(url)
-                if api_key:
-                    req.add_header("Authorization", f"Bearer {api_key}")
-                    req.add_header("X-API-Key", api_key)
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    body = resp.read().decode()
-                data = json.loads(body)
-                rows = data if isinstance(data, list) else [data]
-                for row in rows:
-                    cur.execute(
-                        f"INSERT INTO {schema}.{table} (payload) VALUES (%s::jsonb)",
-                        (json.dumps(row),),
-                    )
-                row_count = len(rows)
+
+                masked_url = url.split("?")[0]  # strip any existing query params for logging
+                log.info("rest_api extract: calling %s (api_key present: %s)", masked_url, bool(api_key))
+
+                all_rows = []
+                next_url = url
+                pages_fetched = 0
+                MAX_PAGES = 5
+
+                while next_url and pages_fetched < MAX_PAGES:
+                    # Build headers and params; try Bearer first
+                    headers = {"Accept": "application/json"}
+                    params  = {}
+                    if api_key:
+                        headers["Authorization"] = f"Bearer {api_key}"
+
+                    try:
+                        resp = httpx.get(
+                            next_url,
+                            headers=headers,
+                            params=params,
+                            timeout=30,
+                            follow_redirects=True,
+                        )
+                    except httpx.TimeoutException:
+                        raise RuntimeError("API request timed out")
+
+                    # If Bearer auth returned 401/403, retry with api_key as query param
+                    if resp.status_code in (401, 403) and api_key:
+                        log.info("rest_api: Bearer auth failed (%d), retrying with api_key query param", resp.status_code)
+                        resp = httpx.get(
+                            next_url,
+                            headers={"Accept": "application/json"},
+                            params={"api_key": api_key},
+                            timeout=30,
+                            follow_redirects=True,
+                        )
+
+                    if resp.status_code == 401 or resp.status_code == 403:
+                        raise RuntimeError("Invalid API key")
+                    if resp.status_code == 404:
+                        raise RuntimeError("URL not found")
+                    if resp.status_code == 429:
+                        raise RuntimeError("Rate limited by API")
+                    resp.raise_for_status()
+
+                    content_type = resp.headers.get("content-type", "")
+                    if "json" not in content_type and not resp.text.strip().startswith(("{", "[")):
+                        raise RuntimeError("API did not return JSON")
+
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        raise RuntimeError("API did not return JSON")
+
+                    # Unwrap common envelope keys
+                    if isinstance(data, dict):
+                        for envelope_key in ("data", "results", "items"):
+                            if envelope_key in data and isinstance(data[envelope_key], list):
+                                data = data[envelope_key]
+                                break
+
+                    page_rows = data if isinstance(data, list) else [data]
+                    all_rows.extend(page_rows)
+                    pages_fetched += 1
+
+                    # Pagination: look for next page indicator
+                    next_url = None
+                    if isinstance(data, dict):
+                        for page_key in ("next_page", "next", "cursor"):
+                            candidate = data.get(page_key)
+                            if candidate and isinstance(candidate, str):
+                                next_url = candidate
+                                log.info("rest_api: following pagination key '%s' -> %s", page_key, candidate.split("?")[0])
+                                break
+                    # If we consumed the envelope, original `data` is now a list so no pagination object
+
+                log.info("rest_api extract: fetched %d total rows across %d page(s)", len(all_rows), pages_fetched)
+
+                # Bulk insert into bronze using executemany
+                insert_sql = (
+                    f"INSERT INTO {schema}.{table} (pipeline_id, payload) "
+                    "VALUES (%s, %s::jsonb)"
+                )
+                cur.executemany(
+                    insert_sql,
+                    [(pipeline_id, json.dumps(r)) for r in all_rows],
+                )
+                row_count = len(all_rows)
 
             elif source_type == "postgresql":
+                # NOTE: in production the connection_config values arrive encrypted
+                # from the API and are decrypted above by _decrypt_config() using
+                # FERNET_KEY.  The test pipeline inserted directly into the DB is
+                # plain-text, which _decrypt_config() handles transparently.
                 import psycopg2 as pg2
+                import psycopg2.errors
+
                 src_host  = config.get("host", "localhost")
                 src_port  = int(config.get("port", 5432))
                 src_db    = config.get("database", "")
-                src_user  = config.get("user", "")
+                src_user  = config.get("username", "")   # frontend sends "username"
                 src_pass  = config.get("password", "")
-                src_table = config.get("table", "")
-                if not src_table:
-                    raise ValueError("postgresql pipeline is missing 'table' in connection_config")
-                src_conn = pg2.connect(
-                    host=src_host, port=src_port, dbname=src_db,
-                    user=src_user, password=src_pass,
+                src_query = config.get("query", "").strip()
+                src_table = config.get("table", "").strip()
+
+                # Determine the SQL to execute and a label for source_table column
+                if src_query:
+                    final_query  = src_query
+                    source_label = "custom_query"
+                elif src_table:
+                    final_query  = f"SELECT * FROM {src_table} LIMIT 1000"
+                    source_label = src_table
+                else:
+                    raise ValueError("No query or table specified in connection config")
+
+                # Log enough to debug without ever logging the password
+                log.info(
+                    "postgresql extract: connecting to %s:%s/%s as user '%s'",
+                    src_host, src_port, src_db, src_user,
                 )
-                src_cur = src_conn.cursor()
-                src_cur.execute(f"SELECT * FROM {src_table}")
-                cols = [desc[0] for desc in src_cur.description]
-                for src_row in src_cur.fetchall():
-                    payload = dict(zip(cols, [str(v) if v is not None else None for v in src_row]))
-                    cur.execute(
-                        f"INSERT INTO {schema}.{table} (payload) VALUES (%s::jsonb)",
-                        (json.dumps(payload),),
+
+                # Ensure the bronze table exists with the full canonical schema
+                cur.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {schema}.raw_postgresql (
+                        id           SERIAL PRIMARY KEY,
+                        pipeline_id  INTEGER,
+                        source_table TEXT,
+                        payload      JSONB,
+                        ingested_at  TIMESTAMP DEFAULT NOW()
                     )
-                    row_count += 1
-                src_cur.close()
-                src_conn.close()
+                    """
+                )
+                conn.commit()
+
+                src_conn = None
+                try:
+                    src_conn = pg2.connect(
+                        host=src_host,
+                        port=src_port,
+                        dbname=src_db,
+                        user=src_user,
+                        password=src_pass,
+                        connect_timeout=10,
+                        options="-c statement_timeout=30000",  # 30-second query timeout
+                    )
+                    src_cur = src_conn.cursor()
+                    src_cur.execute(final_query)
+                    cols      = [desc[0] for desc in src_cur.description]
+                    src_rows  = src_cur.fetchall()
+                    src_cur.close()
+                except pg2.OperationalError as exc:
+                    msg = str(exc).lower()
+                    if "connection refused" in msg or "could not connect" in msg or "no route" in msg:
+                        raise RuntimeError(
+                            f"Cannot connect to database at {src_host}:{src_port}"
+                        ) from exc
+                    if "password" in msg or "authentication" in msg or "invalid password" in msg:
+                        raise RuntimeError("Invalid database credentials") from exc
+                    raise
+                except pg2.errors.QueryCanceled as exc:
+                    raise RuntimeError("Query timed out after 30 seconds") from exc
+                except pg2.errors.UndefinedTable as exc:
+                    raise RuntimeError(
+                        f"Table {src_table!r} does not exist"
+                    ) from exc
+                finally:
+                    # Always release the source connection — never let it leak
+                    if src_conn is not None:
+                        try:
+                            src_conn.close()
+                        except Exception:
+                            pass
+
+                # Convert each row to a dict; cast non-serialisable types to str
+                pg_rows = [
+                    dict(zip(cols, [str(v) if v is not None else None for v in r]))
+                    for r in src_rows
+                ]
+
+                log.info(
+                    "postgresql extract: fetched %d row(s) from %s:%s/%s",
+                    len(pg_rows), src_host, src_port, src_db,
+                )
+
+                insert_sql = (
+                    f"INSERT INTO {schema}.raw_postgresql "
+                    "(pipeline_id, source_table, payload) "
+                    "VALUES (%s, %s, %s::jsonb)"
+                )
+                cur.executemany(
+                    insert_sql,
+                    [(pipeline_id, source_label, json.dumps(r)) for r in pg_rows],
+                )
+                row_count = len(pg_rows)
 
             elif source_type == "csv":
-                upload_path = f"/tmp/uploads/{pipeline_id}.csv"
+                upload_path = f"/tmp/uploads/{user_id}_{pipeline_id}.csv"
                 if not os.path.exists(upload_path):
-                    log.warning("CSV file not found at %s — skipping extract", upload_path)
-                else:
-                    with open(upload_path, newline="") as fh:
-                        reader = csv.DictReader(fh)
-                        for csv_row in reader:
-                            cur.execute(
-                                f"INSERT INTO {schema}.{table} (payload) VALUES (%s::jsonb)",
-                                (json.dumps(dict(csv_row)),),
-                            )
-                            row_count += 1
+                    raise FileNotFoundError(
+                        "No CSV file uploaded for this pipeline. "
+                        "Please upload a file before triggering a run."
+                    )
+
+                # Ensure the bronze table exists with the canonical schema
+                cur.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {schema}.raw_csv (
+                        id          SERIAL PRIMARY KEY,
+                        pipeline_id INTEGER,
+                        payload     JSONB,
+                        ingested_at TIMESTAMP DEFAULT NOW()
+                    )
+                    """
+                )
+                conn.commit()
+
+                with open(upload_path, newline="", encoding="utf-8-sig") as fh:
+                    reader = csv.DictReader(fh)
+                    csv_rows = list(reader)
+
+                if not csv_rows:
+                    raise ValueError("CSV file contains no data rows.")
+
+                # Validate at least one column is present
+                if not reader.fieldnames:
+                    raise ValueError("CSV file has no columns.")
+
+                log.info(
+                    "csv extract: pipeline_id=%d user_id=%d path=%s rows=%d cols=%d",
+                    pipeline_id, user_id, upload_path, len(csv_rows), len(reader.fieldnames),
+                )
+
+                insert_sql = (
+                    f"INSERT INTO {schema}.raw_csv (pipeline_id, payload) "
+                    "VALUES (%s, %s::jsonb)"
+                )
+                cur.executemany(
+                    insert_sql,
+                    [(pipeline_id, json.dumps(dict(r))) for r in csv_rows],
+                )
+                row_count = len(csv_rows)
 
             else:
                 log.warning(
