@@ -31,7 +31,7 @@ export default function LoginPage() {
     try {
       await loginMutation.mutateAsync({ email, password });
       toast.success("Successfully logged in");
-      router.push("/");
+      router.push("/pipelines");
     } catch (error: any) {
       toast.error(error.message || "Failed to login");
     }

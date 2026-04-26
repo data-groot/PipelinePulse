@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatDistanceToNow, subDays, format } from 'date-fns';
-import { Database, CheckCircle, AlertTriangle, Clock, ShieldCheck } from 'lucide-react';
+import { Database, CheckCircle, AlertTriangle, Clock, ShieldCheck, Activity, ListTree } from 'lucide-react';
 
 export default function DashboardPage() {
   const today = new Date();
@@ -82,252 +82,242 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 animate-in-slide">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] -z-10" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] -z-10" />
+
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your pipeline health and data activity.</p>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-1 w-8 bg-primary rounded-full" />
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">System Overview</span>
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight text-glow">Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Real-time health telemetry for your data ecosystem.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full glass border-white/5">
+            <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_theme(colors.emerald.500)]' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-mono uppercase tracking-wider">{isConnected ? 'Uplink Active' : 'Uplink Offline'}</span>
+          </div>
         </div>
       </div>
 
       {/* KPI Summary Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pipelines</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loadingPipelines ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-2xl font-bold">{totalPipelines}</div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pipelines Healthy</CardTitle>
-            {healthyPipelines === totalPipelines && totalPipelines > 0 ? (
-              <CheckCircle className="h-4 w-4 text-emerald-500" />
-            ) : (
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            {loadingPipelines ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-2xl font-bold">
-                {healthyPipelines} / {totalPipelines}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Quality Score</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loadingQuality ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-2xl font-bold">
-                {avgQualityData && avgQualityData.check_count > 0
-                  ? `${avgQualityPct.toFixed(1)}%`
-                  : 'No data yet'}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Last Run</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loadingPipelines ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <div className="text-2xl font-bold capitalize">{lastRunText}</div>
-            )}
-          </CardContent>
-        </Card>
+        {[
+          { title: "Total Pipelines", value: totalPipelines, icon: Database, color: "text-blue-400", loading: loadingPipelines },
+          { 
+            title: "Pipelines Healthy", 
+            value: `${healthyPipelines} / ${totalPipelines}`, 
+            icon: healthyPipelines === totalPipelines && totalPipelines > 0 ? CheckCircle : AlertTriangle,
+            color: healthyPipelines === totalPipelines ? "text-emerald-400" : "text-amber-400",
+            loading: loadingPipelines 
+          },
+          { 
+            title: "Quality Score", 
+            value: avgQualityData && avgQualityData.check_count > 0 ? `${avgQualityPct.toFixed(1)}%` : 'N/A', 
+            icon: ShieldCheck, 
+            color: "text-primary",
+            loading: loadingQuality 
+          },
+          { title: "Last Activity", value: lastRunText, icon: Clock, color: "text-purple-400", loading: loadingPipelines }
+        ].map((kpi, i) => (
+          <Card key={i} className="glass-card hover-lift overflow-hidden group">
+            <div className={`absolute top-0 left-0 w-1 h-full ${kpi.color.replace('text', 'bg')} opacity-50`} />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{kpi.title}</CardTitle>
+              <kpi.icon className={`h-4 w-4 ${kpi.color} group-hover:scale-110 transition-transform`} />
+            </CardHeader>
+            <CardContent>
+              {kpi.loading ? (
+                <Skeleton className="h-8 w-20 bg-white/5" />
+              ) : (
+                <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Revenue Chart Section */}
-      <Card className="col-span-4">
-        <CardHeader>
-          <CardTitle>Revenue Analytics (Last 30 Days)</CardTitle>
-          <CardDescription>Daily revenue and order counts from processed pipeline data.</CardDescription>
-        </CardHeader>
-        <CardContent className="h-[300px]">
-          {loadingRevenue ? (
-            <Skeleton className="h-full w-full" />
-          ) : revenueData?.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={revenueData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(val) => format(new Date(val), 'MMM dd')}
-                />
-                <YAxis yAxisId="left" tickFormatter={(val) => `$${val / 1000}k`} />
-                <YAxis yAxisId="right" orientation="right" />
-                <RechartsTooltip
-                  labelFormatter={(val) => format(new Date(val), 'MMM dd, yyyy')}
-                />
-                <Legend />
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="total_revenue"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  name="Total Revenue ($)"
-                  dot={false}
-                  activeDot={{ r: 8 }}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="successful_orders"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  name="Successful Orders"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              No revenue data available yet.
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Revenue Chart Section */}
+        <Card className="lg:col-span-2 glass-card overflow-hidden">
+          <CardHeader className="border-b border-white/5 bg-white/[0.02]">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Revenue Pulse</CardTitle>
+                <CardDescription className="text-xs">30-day economic throughput analytics</CardDescription>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] text-muted-foreground uppercase font-mono">Revenue</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="text-[10px] text-muted-foreground uppercase font-mono">Orders</span>
+                </div>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Pipeline Status Grid */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium tracking-tight">Pipeline Status</h3>
-          {loadingPipelines ? (
-            <div className="space-y-3">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </div>
-          ) : pipelines?.length === 0 ? (
-            <div className="text-muted-foreground">No pipelines configured.</div>
-          ) : (
-            <div className="grid gap-3 grid-cols-1">
-              {pipelines?.map((pipe: any) => (
-                <Card key={pipe.id} className="overflow-hidden">
-                  <div
-                    className={`h-1 w-full ${pipe.enabled ? 'bg-emerald-500' : 'bg-gray-500'}`}
+          </CardHeader>
+          <CardContent className="h-[350px] p-6 pt-8">
+            {loadingRevenue ? (
+              <Skeleton className="h-full w-full bg-white/5" />
+            ) : revenueData?.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={revenueData}>
+                  <defs>
+                    <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(val) => format(new Date(val), 'MMM dd')}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-jetbrains)' }}
                   />
-                  <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-base">{pipe.name}</CardTitle>
-                      <CardDescription className="text-xs mt-1">{pipe.schedule}</CardDescription>
-                    </div>
-                    {getStatusBadge(pipe.last_run_status || 'never run')}
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0 text-sm grid grid-cols-2 gap-2 text-muted-foreground">
-                    <div>
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider mb-1">
-                        Last Run
-                      </span>
-                      {pipe.last_run_time
-                        ? formatDistanceToNow(new Date(pipe.last_run_time), {
-                            addSuffix: true,
-                          })
-                        : 'Never'}
-                    </div>
-                    <div>
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider mb-1">
-                        Rows Ingested
-                      </span>
-                      {pipe.rows_processed != null
-                        ? pipe.rows_processed.toLocaleString()
-                        : 'Run pipeline to see data'}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+                  <YAxis 
+                    yAxisId="left" 
+                    tickFormatter={(val) => `$${val / 1000}k`}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-jetbrains)' }}
+                  />
+                  <YAxis yAxisId="right" orientation="right" hide />
+                  <RechartsTooltip
+                    contentStyle={{ backgroundColor: 'rgba(13, 23, 40, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(10px)' }}
+                    labelStyle={{ color: 'rgba(255,255,255,0.8)', fontWeight: 'bold', marginBottom: '4px' }}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="total_revenue"
+                    stroke="#10b981"
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 6, fill: '#10b981', strokeWidth: 0 }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="successful_orders"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-muted-foreground font-mono text-xs uppercase tracking-wider">
+                No telemetry data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Live Run Feed */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium tracking-tight">Live Run Feed</h3>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {isConnected ? 'Connected' : 'Reconnecting...'}
-              </span>
-              <div
-                className={`h-2.5 w-2.5 rounded-full ${
-                  isConnected
-                    ? 'bg-emerald-500 shadow-[0_0_8px_theme(colors.emerald.500)] animate-pulse'
-                    : 'bg-red-500'
-                }`}
-              />
-            </div>
-          </div>
-          <Card>
+        <Card className="glass-card flex flex-col overflow-hidden">
+          <CardHeader className="border-b border-white/5 bg-white/[0.02]">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Live Events
+            </CardTitle>
+            <CardDescription className="text-xs">Real-time execution stream</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 p-0 overflow-auto custom-scrollbar">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pipeline</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead className="text-right">Rows</TableHead>
-                </TableRow>
-              </TableHeader>
               <TableBody>
                 {liveFeed.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="text-center h-24 text-muted-foreground"
-                    >
-                      Listening for events...
+                    <TableCell className="text-center h-40 text-muted-foreground font-mono text-[10px] uppercase tracking-widest">
+                      Establishing connection...
                     </TableCell>
                   </TableRow>
                 ) : (
-                  liveFeed.slice(0, 10).map((event: any, i: number) => (
-                    <TableRow
-                      key={event.run_id || i}
-                      className="animate-in fade-in slide-in-from-top-4 duration-500"
-                    >
-                      <TableCell className="font-medium">{event.pipeline}</TableCell>
-                      <TableCell>{getStatusBadge(event.status)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {event.started
-                          ? formatDistanceToNow(new Date(event.started), {
-                              addSuffix: true,
-                            })
-                          : ''}
+                  liveFeed.slice(0, 12).map((event: any, i: number) => (
+                    <TableRow key={event.run_id || i} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
+                      <TableCell className="py-3">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-xs">{event.pipeline}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {event.started ? format(new Date(event.started), 'HH:mm:ss') : '--:--:--'}
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {event.rows?.toLocaleString() || 0}
+                      <TableCell className="py-3">
+                        <div className={`text-[10px] px-2 py-0.5 rounded-full inline-flex font-mono uppercase tracking-tighter ${
+                          event.status === 'success' ? 'status-success' : 
+                          event.status === 'running' ? 'status-running' : 'status-failed'
+                        }`}>
+                          {event.status}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
-          </Card>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pipeline Status Grid */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <ListTree className="h-4 w-4 text-primary" />
+          <h3 className="text-lg font-bold tracking-tight text-glow">Managed Pipelines</h3>
         </div>
+        
+        {loadingPipelines ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full glass-card" />)}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {pipelines?.map((pipe: any) => (
+              <Card key={pipe.id} className="glass-card hover-lift group relative overflow-hidden">
+                <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity`}>
+                   <Database size={48} />
+                </div>
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg group-hover:text-primary transition-colors">{pipe.name}</CardTitle>
+                      <CardDescription className="text-[10px] font-mono uppercase tracking-widest mt-1">
+                        {pipe.schedule}
+                      </CardDescription>
+                    </div>
+                    {getStatusBadge(pipe.last_run_status || 'never run')}
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-muted-foreground block">Rows Processed</span>
+                      <span className="text-sm font-bold tracking-tight">
+                        {pipe.rows_processed?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-muted-foreground block">Health State</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`h-1.5 w-1.5 rounded-full ${pipe.enabled ? 'bg-emerald-500' : 'bg-muted'}`} />
+                        <span className="text-xs">{pipe.enabled ? 'Enabled' : 'Paused'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
