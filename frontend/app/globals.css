@@ -2,8 +2,6 @@
 
 @plugin "tailwindcss-animate";
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -48,83 +46,87 @@
 }
 
 :root {
-  --background: #050a05;
-  --foreground: #ffffff;
-  --card: #0a0f0a;
-  --card-foreground: #ffffff;
-  --popover: #0a0f0a;
-  --popover-foreground: #ffffff;
-  --primary: #00ff41;
-  --primary-foreground: #000000;
-  --secondary: #ff8c00;
-  --secondary-foreground: #000000;
-  --muted: #1a1f1a;
-  --muted-foreground: #888888;
-  --accent: #00ff41;
-  --accent-foreground: #000000;
+  --background: #07101d;
+  --foreground: #f5f8ff;
+  --card: #0d1728;
+  --card-foreground: #f5f8ff;
+  --popover: #0d1728;
+  --popover-foreground: #f5f8ff;
+  --primary: #2bd9a7;
+  --primary-foreground: #04130e;
+  --secondary: #7ccfff;
+  --secondary-foreground: #04111c;
+  --muted: #101c30;
+  --muted-foreground: #8ca0be;
+  --accent: #2bd9a7;
+  --accent-foreground: #04130e;
   --destructive: #ff6b6b;
   --destructive-foreground: #ffffff;
-  --border: #1a3a1a;
-  --input: #0f140f;
-  --ring: #00ff41;
-  --chart-1: #00ff41;
-  --chart-2: #ff8c00;
-  --chart-3: #00ccff;
-  --chart-4: #ff00ff;
-  --chart-5: #ffff00;
+  --border: #1a2942;
+  --input: #0d1626;
+  --ring: #2bd9a7;
+  --chart-1: #2bd9a7;
+  --chart-2: #7ccfff;
+  --chart-3: #ffc86b;
+  --chart-4: #7d8dff;
+  --chart-5: #f774b8;
   --radius: 0.25rem;
-  --sidebar: #050a05;
-  --sidebar-foreground: #00ff41;
-  --sidebar-primary: #00ff41;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #ff8c00;
-  --sidebar-accent-foreground: #000000;
-  --sidebar-border: #1a3a1a;
-  --sidebar-ring: #00ff41;
+  --sidebar: #091221;
+  --sidebar-foreground: #d7e3f5;
+  --sidebar-primary: #2bd9a7;
+  --sidebar-primary-foreground: #04130e;
+  --sidebar-accent: #132039;
+  --sidebar-accent-foreground: #f5f8ff;
+  --sidebar-border: #1a2942;
+  --sidebar-ring: #2bd9a7;
 }
 
 .dark {
-  --background: #050a05;
-  --foreground: #ffffff;
-  --card: #0a0f0a;
-  --card-foreground: #ffffff;
-  --popover: #0a0f0a;
-  --popover-foreground: #ffffff;
-  --primary: #00ff41;
-  --primary-foreground: #000000;
-  --secondary: #ff8c00;
-  --secondary-foreground: #000000;
-  --muted: #1a1f1a;
-  --muted-foreground: #888888;
-  --accent: #00ff41;
-  --accent-foreground: #000000;
+  --background: #07101d;
+  --foreground: #f5f8ff;
+  --card: #0d1728;
+  --card-foreground: #f5f8ff;
+  --popover: #0d1728;
+  --popover-foreground: #f5f8ff;
+  --primary: #2bd9a7;
+  --primary-foreground: #04130e;
+  --secondary: #7ccfff;
+  --secondary-foreground: #04111c;
+  --muted: #101c30;
+  --muted-foreground: #8ca0be;
+  --accent: #2bd9a7;
+  --accent-foreground: #04130e;
   --destructive: #ff6b6b;
   --destructive-foreground: #ffffff;
-  --border: #1a3a1a;
-  --input: #0f140f;
-  --ring: #00ff41;
-  --chart-1: #00ff41;
-  --chart-2: #ff8c00;
-  --chart-3: #00ccff;
-  --chart-4: #ff00ff;
-  --chart-5: #ffff00;
-  --sidebar: #050a05;
-  --sidebar-foreground: #00ff41;
-  --sidebar-primary: #00ff41;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #ff8c00;
-  --sidebar-accent-foreground: #000000;
-  --sidebar-border: #1a3a1a;
-  --sidebar-ring: #00ff41;
+  --border: #1a2942;
+  --input: #0d1626;
+  --ring: #2bd9a7;
+  --chart-1: #2bd9a7;
+  --chart-2: #7ccfff;
+  --chart-3: #ffc86b;
+  --chart-4: #7d8dff;
+  --chart-5: #f774b8;
+  --sidebar: #091221;
+  --sidebar-foreground: #d7e3f5;
+  --sidebar-primary: #2bd9a7;
+  --sidebar-primary-foreground: #04130e;
+  --sidebar-accent: #132039;
+  --sidebar-accent-foreground: #f5f8ff;
+  --sidebar-border: #1a2942;
+  --sidebar-ring: #2bd9a7;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background-image: radial-gradient(circle at top, rgba(72, 214, 189, 0.08), transparent 24%);
   }
 }
 
@@ -150,6 +152,18 @@
   
   .animate-in-slide {
     animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .section-fade-in {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s ease-out, 
+                transform 0.8s ease-out;
+  }
+
+  .section-fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   /* Status Colors */
@@ -235,6 +249,41 @@
     animation: typewriter 4s steps(50, end) forwards;
     overflow: hidden;
   }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s ease-out forwards;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+    opacity: 0;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+    opacity: 0;
+  }
+  
+  .animation-delay-600 {
+    animation-delay: 600ms;
+    opacity: 0;
+  }
+
+  .animation-delay-800 {
+    animation-delay: 800ms;
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeIn {
@@ -310,5 +359,260 @@
   50% {
     border-color: rgba(0, 255, 65, 1);
     box-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
+  }
+}
+
+/* ── Landing page keyframes ── */
+
+@keyframes pixel-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes pixel-flicker {
+  0% {
+    opacity: 1;
+    transform: scaleY(1) scaleX(1);
+  }
+  33% {
+    opacity: 0.8;
+    transform: scaleY(1.15) scaleX(0.9);
+  }
+  66% {
+    opacity: 0.9;
+    transform: scaleY(0.9) scaleX(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1.05) scaleX(0.95);
+  }
+}
+
+@keyframes pixel-scan {
+  0% {
+    top: 0;
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes pixel-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pixel-signal {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+@keyframes pixel-flow {
+  0% {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(calc(100vw + 20px));
+    opacity: 0;
+  }
+}
+
+@keyframes pixel-idle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  25% {
+    transform: translateY(-1px);
+  }
+  75% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes signal-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+@keyframes data-flow {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(200px);
+    opacity: 0;
+  }
+}
+
+/* ── Control-room keyframes (landing page v2) ── */
+
+/* Status lights breathing */
+@keyframes ctrl-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
+  }
+  50% {
+    opacity: 0.45;
+    box-shadow: 0 0 2px currentColor;
+  }
+}
+
+/* Rocket flame flicker */
+@keyframes ctrl-flicker {
+  0% {
+    opacity: 1;
+    transform: scaleY(1) scaleX(1);
+  }
+  40% {
+    opacity: 0.75;
+    transform: scaleY(1.18) scaleX(0.88);
+  }
+  70% {
+    opacity: 0.9;
+    transform: scaleY(0.88) scaleX(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1.06) scaleX(0.94);
+  }
+}
+
+/* Screen scanline sweep */
+@keyframes ctrl-scan {
+  0% {
+    top: 0;
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.5;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+/* Waveform horizontal scroll */
+@keyframes ctrl-wave {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-25%);
+  }
+}
+
+/* Data packet moving along Bronze→Silver→Gold path */
+@keyframes ctrl-flow {
+  0% {
+    transform: translateX(0px);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(18px);
+    opacity: 0;
+  }
+}
+
+/* Signal tower ping rings expand + fade */
+@keyframes ctrl-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Operator head bob */
+@keyframes ctrl-idle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  30% {
+    transform: translateY(-1px);
+  }
+  70% {
+    transform: translateY(1px);
+  }
+}
+
+/* Indicator light hard blink */
+@keyframes ctrl-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0.15;
+  }
+}
+
+/* Gentle vertical float (rocket on pad) */
+@keyframes ctrl-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Pulsing glow intensity */
+@keyframes ctrl-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.8), 0 0 40px rgba(34, 197, 94, 0.4);
   }
 }
