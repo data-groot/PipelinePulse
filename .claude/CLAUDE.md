@@ -1,56 +1,28 @@
 # PipelinePulse — Project Context
 
-PipelinePulse is a multi-tenant ETL observability platform.
+PipelinePulse v2 is a self-serve multi-tenant ETL platform with observability: users connect a source (REST API / PostgreSQL / CSV), pick a schedule, and get bronze → silver → gold data with quality scores on a live dashboard.
 
-Target stack:
+v2 deliberately replaced the v1 stack (Airflow, dbt, schema-per-user, WebSockets, Kubernetes) with a lean design. Do not reintroduce those.
 
-- Frontend: Next.js 15, App Router, TypeScript, Tailwind, shadcn/ui, Recharts, TanStack Query v5
-- Backend: FastAPI, Python 3.12, SQLAlchemy async, Pydantic v2, Alembic, JWT auth
-- Data: PostgreSQL 16
-- Orchestration: Apache Airflow 2.9
-- Transforms: dbt-core
-- Infra: Docker Compose local, Kubernetes production, GitHub Actions CI/CD
+## Stack
 
-Target architecture:
+- Frontend: Next.js 16 (App Router), TypeScript, Tailwind v4, shadcn/ui on **Base UI** (`render` prop, NOT Radix `asChild`), TanStack Query v5, Recharts. Deployed on Vercel.
+- Backend: FastAPI, Python 3.12, SQLAlchemy 2 async, Pydantic v2. Deployed on Google Cloud Run (scale-to-zero).
+- DB: PostgreSQL 16 — local via docker-compose, prod on Neon. Tables created by `create_all` on startup (no Alembic).
+- Scheduling: Google Cloud Scheduler → `POST /internal/scheduler/tick` (guarded by `X-Scheduler-Secret` header). No orchestrator process.
 
-- Schema-per-user multi-tenancy: user*{id}\_bronze, user*{id}_silver, user_{id}\_gold
-- Dynamic DAG generation from pipeline configs
-- User-defined pipelines, not hardcoded demo DAGs
-- Authenticated ownership checks on all user data
-- Bronze -> Silver -> Gold data flow
-- Data quality checks after each run
-- Live dashboard updates through WebSocket
+## Architecture rules
 
-Current repo realities to remember (as of 2026-04-12):
+- Multi-tenancy is row-level: every query is scoped by `user_id`/`pipeline_id` FKs. No per-user schemas, no runtime DDL.
+- Auth is httpOnly-cookie JWT ONLY. No localStorage tokens, no Bearer headers. The frontend proxies `/api/*` and `/auth/*` to the backend via Next.js rewrites (`next.config.ts`, `BACKEND_URL` env), so requests are same-origin — do not add CORS workarounds.
+- The run engine (`backend/app/engine/`) is the heart: `execute_pipeline` = extract (connectors.py) → transform bronze→silver→gold (transform.py, full rebuild, idempotent) → quality checks (quality.py, 4 checks scored 0–1) → record run. Runs are awaited synchronously; extraction is capped (settings: 1000 rows / 5 pages).
+- Live updates are TanStack Query polling (5–10s). No WebSockets.
+- Connection configs are Fernet-encrypted strings in `pipelines.connection_config`.
+- Code must stay SQLite-compatible for tests (JSONB via `with_variant`, no pg-only statements, guard tz-naive datetimes).
 
-- Auth is fully working: JWT in httpOnly cookie + localStorage, signup/login/logout all functional.
-- Pipeline creation form is live: POST /api/pipelines creates pipelines with per-user ownership.
-- DAG factory is built: airflow/dags/dag_factory.py auto-generates one Airflow DAG per active user pipeline.
-- orders_ingest_dag runs end to end (extract -> dbt_transform -> quality_check -> update_run).
-- FERNET_KEY is set across backend, airflow-scheduler, and airflow-webserver.
-- Per-user bronze/silver/gold schemas are created automatically on signup and pipeline creation.
-- GET /api/pipelines is user-scoped (returns only the authenticated user's pipelines).
-- Frontend auth guard (middleware.ts) redirects unauthenticated users to /login.
-- Demo pipelines (WeatherFlow, OrderStream, GitPulse) have user_id=NULL and are excluded from user pipeline lists.
-- Legacy routers (metrics.py, quality.py, websocket.py) still import from app.database / app.models.meta_models -- not yet canonicalized.
-- No Alembic migration files for the user_id/dag_id/connection_config columns added in this session.
+## Working on this repo
 
-Rules:
-
-1. Do not deviate from the approved stack.
-2. Prefer cohesive changes over scattered rewrites.
-3. Before editing, read the relevant files and determine the canonical code path.
-4. Reconcile duplicated abstractions instead of adding a third one.
-5. For any feature touching multiple layers, verify the contract end-to-end.
-6. Protect secrets. Never read or expose .env values unless explicitly required and allowed.
-7. Prefer minimal, testable progress that moves the repo toward the target architecture.
-8. When proposing work, separate:
-   - current state
-   - target state
-   - gap
-   - recommended next change
-9. When finishing a task, summarize:
-   - files changed
-   - commands run
-   - validation performed
-   - known risks / follow-ups
+- Backend tests: `cd backend && python -m pytest` (in-memory SQLite, respx for HTTP mocks). Keep them passing.
+- Frontend must pass `npm run build` (TypeScript strict).
+- Landing page (`frontend/app/page.tsx`) contains a Three.js voxel scene (`components/Voxel*.ts*`) — don't regress it.
+- E2E smoke: docker compose up → uvicorn on :8000 → npm run dev → signup → Load sample → Run now → dashboard shows data.
