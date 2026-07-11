@@ -16,7 +16,7 @@ import {
   Sparkles,
   Waves,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const VoxelControlRoom = dynamic(() => import('@/components/VoxelControlRoom'), {
   ssr: false,
@@ -244,6 +244,15 @@ function DashboardPanel() {
 }
 
 export default function HomePage() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   useEffect(() => {
     const observerOptions = {
       root: null,
@@ -275,7 +284,7 @@ export default function HomePage() {
         <div className="landing-grid" />
       </div>
 
-      <nav className="fixed top-0 left-0 right-0 z-50" style={{ background: 'linear-gradient(to bottom, rgba(3,7,18,0.85) 0%, rgba(3,7,18,0.4) 70%, transparent 100%)' }}>
+      <nav className={`landing-nav fixed top-0 left-0 right-0 z-50 ${scrolled ? 'nav-scrolled' : ''}`}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
 
           {/* Logo */}
@@ -367,8 +376,9 @@ export default function HomePage() {
             }}
           >
             A cinematic control room for{' '}
-            <span style={{
-              background: 'linear-gradient(90deg, #36e2b8 0%, #0eb5c8 55%, #7fd8ff 100%)',
+            <span className="gradient-shimmer" style={{
+              background: 'linear-gradient(90deg, #36e2b8 0%, #0eb5c8 40%, #7fd8ff 60%, #36e2b8 100%)',
+              backgroundSize: '200% 100%',
               WebkitBackgroundClip: 'text',
               backgroundClip: 'text',
               color: 'transparent',
@@ -813,10 +823,32 @@ export default function HomePage() {
         }
 
         .primary-cta {
+          position: relative;
+          overflow: hidden;
           padding: 0.95rem 1.4rem;
           color: #041610;
           background: linear-gradient(135deg, #2cff98 0%, #22d6a2 58%, #18b7af 100%);
           box-shadow: 0 18px 50px rgba(34, 214, 162, 0.28);
+        }
+
+        .primary-cta::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -80%;
+          width: 55%;
+          height: 100%;
+          background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+          transform: skewX(-20deg);
+          transition: left 480ms ease;
+        }
+
+        .primary-cta:hover::after {
+          left: 130%;
+        }
+
+        .primary-cta:hover {
+          box-shadow: 0 20px 60px rgba(34, 214, 162, 0.45);
         }
 
         .primary-cta:hover,
@@ -965,6 +997,8 @@ export default function HomePage() {
 
         .capability-card,
         .signal-card {
+          position: relative;
+          overflow: hidden;
           padding: 1.5rem;
           border-radius: 1.5rem;
           border: 1px solid rgba(125, 147, 182, 0.14);
@@ -972,6 +1006,41 @@ export default function HomePage() {
             linear-gradient(180deg, rgba(12, 20, 38, 0.95), rgba(7, 12, 23, 0.84)),
             radial-gradient(circle at top right, rgba(69, 195, 255, 0.08), transparent 34%);
           box-shadow: 0 26px 60px rgba(0, 0, 0, 0.18);
+          transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 260ms ease, box-shadow 260ms ease;
+        }
+
+        .capability-card::before,
+        .signal-card::before,
+        .how-step::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 12%;
+          right: 12%;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(54, 226, 184, 0.55), transparent);
+          opacity: 0;
+          transition: opacity 260ms ease;
+        }
+
+        .capability-card:hover,
+        .signal-card:hover {
+          transform: translateY(-6px);
+          border-color: rgba(54, 226, 184, 0.35);
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3), 0 0 40px rgba(34, 214, 162, 0.09);
+        }
+
+        .capability-card:hover::before,
+        .signal-card:hover::before,
+        .how-step:hover::before {
+          opacity: 1;
+        }
+
+        .capability-card:hover .capability-icon,
+        .signal-card:hover .signal-icon {
+          transform: scale(1.08);
+          box-shadow: 0 0 24px rgba(54, 226, 184, 0.25);
         }
 
         .capability-icon,
@@ -985,6 +1054,7 @@ export default function HomePage() {
           color: #65f0c5;
           background: linear-gradient(180deg, rgba(36, 223, 177, 0.16), rgba(14, 40, 44, 0.6));
           border: 1px solid rgba(64, 218, 176, 0.22);
+          transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms ease;
         }
 
         .capability-card h3,
@@ -1367,15 +1437,73 @@ export default function HomePage() {
           text-transform: uppercase;
         }
 
-        /* ── Scroll-reveal ── */
+        /* ── Scroll-reveal with staggered children ── */
         .section-fade-in {
           opacity: 0;
-          transform: translateY(24px);
-          transition: opacity 0.65s ease, transform 0.65s ease;
+          transform: translateY(32px);
+          transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
         }
         .section-fade-in.visible {
           opacity: 1;
           transform: translateY(0);
+        }
+        .section-fade-in .capability-card,
+        .section-fade-in .signal-card,
+        .section-fade-in .how-step {
+          opacity: 0;
+          transform: translateY(26px);
+          transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 260ms ease, box-shadow 260ms ease;
+        }
+        .section-fade-in.visible .capability-card,
+        .section-fade-in.visible .signal-card,
+        .section-fade-in.visible .how-step {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        .section-fade-in.visible :is(.capability-card, .signal-card, .how-step):nth-child(1) { transition-delay: 0.1s; }
+        .section-fade-in.visible :is(.capability-card, .signal-card, .how-step):nth-child(2) { transition-delay: 0.22s; }
+        .section-fade-in.visible :is(.capability-card, .signal-card, .how-step):nth-child(3) { transition-delay: 0.34s; }
+        .section-fade-in.visible :is(.capability-card, .signal-card, .how-step):nth-child(4) { transition-delay: 0.46s; }
+        .section-fade-in.visible :is(.capability-card, .signal-card, .how-step):nth-child(5) { transition-delay: 0.58s; }
+        .section-fade-in.visible :is(.capability-card, .signal-card, .how-step):hover {
+          transform: translateY(-6px);
+          transition-delay: 0s;
+        }
+
+        /* ── Nav scroll state ── */
+        .landing-nav {
+          background: linear-gradient(to bottom, rgba(3, 7, 18, 0.85) 0%, rgba(3, 7, 18, 0.4) 70%, transparent 100%);
+          border-bottom: 1px solid transparent;
+          transition: background 320ms ease, border-color 320ms ease, backdrop-filter 320ms ease;
+        }
+        .landing-nav.nav-scrolled {
+          background: rgba(3, 7, 18, 0.72);
+          backdrop-filter: blur(14px);
+          border-bottom-color: rgba(54, 226, 184, 0.12);
+        }
+
+        /* ── Headline gradient shimmer ── */
+        .gradient-shimmer {
+          animation: gradient-pan 7s linear infinite;
+        }
+        @keyframes gradient-pan {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .section-fade-in,
+          .section-fade-in .capability-card,
+          .section-fade-in .signal-card,
+          .section-fade-in .how-step {
+            opacity: 1;
+            transform: none;
+            transition: none;
+          }
+          .gradient-shimmer { animation: none; }
         }
 
         /* ── How it works ── */
@@ -1390,6 +1518,8 @@ export default function HomePage() {
         }
         .how-step {
           flex: 1;
+          position: relative;
+          overflow: hidden;
           padding: 2rem 1.75rem;
           border-radius: 1.5rem;
           border: 1px solid rgba(125, 147, 182, 0.14);
@@ -1399,6 +1529,14 @@ export default function HomePage() {
           display: flex;
           flex-direction: column;
           gap: 0.85rem;
+          transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 260ms ease, box-shadow 260ms ease;
+        }
+
+        .how-step:hover {
+          transform: translateY(-6px);
+          border-color: rgba(54, 226, 184, 0.35);
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3), 0 0 40px rgba(34, 214, 162, 0.09);
         }
         .step-number {
           font-family: var(--font-jetbrains), monospace;

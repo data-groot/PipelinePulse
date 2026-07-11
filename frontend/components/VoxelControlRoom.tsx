@@ -2,9 +2,12 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createCharacter, updateCharacters, CHARACTER_CONFIGS, CharacterData, CharacterConfig } from './VoxelCharacters'
 import { createMonitoringCanvas, updateMonitoringCanvas } from './MonitoringScreen'
-import { createEnvironment, updateEnvironment } from './ControlRoomEnvironment'
+import { createEnvironment, updateEnvironment, CONSOLE_POSITIONS } from './ControlRoomEnvironment'
 
 // ─── Extra character configs beyond the 8 presets ─────────────────────────────
 
@@ -19,48 +22,26 @@ const EXTRA_CONFIGS: CharacterConfig[] = [
   },
 ]
 
-const ALL_CONFIGS = [...CHARACTER_CONFIGS, ...EXTRA_CONFIGS]
-
-// ─── Layout: 10 characters in 3 rows, minimum 2.5-unit spacing ───────────────
-
-const CHARACTER_DEFS: { pos: [number, number, number]; rotY: number }[] = [
-  // Row 1 — seated at front consoles (arc facing screen)
-  { pos: [-8, 0, -5], rotY:  0    },  // 0 seated, far-left console
-  { pos: [-4, 0, -6], rotY:  0    },  // 1 seated, left-center console
-  { pos: [ 0, 0, -6], rotY:  0    },  // 2 seated, center console
-  { pos: [ 4, 0, -5], rotY:  0    },  // 3 standing at right console
-  // Row 2 — mid-floor operators
-  { pos: [-7, 0, -1], rotY:  0.2  },  // 4 standing, left-mid
-  { pos: [-3, 0, -2], rotY:  0    },  // 5 seated, center-left
-  { pos: [ 2, 0, -1], rotY:  0.3  },  // 6 pointing toward screen
-  // Row 3 — walkers on separate z-lanes
-  { pos: [-5, 0,  3], rotY:  1.57 },  // 7 walking, lane z=3
-  { pos: [ 5, 0,  1], rotY: -1.57 },  // 8 walking, lane z=1
-  { pos: [ 7, 0,  4], rotY: -0.5  },  // 9 pointing, back-right
+// Poses reordered so the six console seats get seated characters
+const SEATED = { pose: 'seated' as const }
+const CONFIGS: CharacterConfig[] = [
+  { ...CHARACTER_CONFIGS[0] },                     // seated
+  { ...CHARACTER_CONFIGS[3] },                     // seated
+  { ...CHARACTER_CONFIGS[7] },                     // seated
+  { ...CHARACTER_CONFIGS[1], ...SEATED },          // seated (was standing)
+  { ...CHARACTER_CONFIGS[5], ...SEATED },          // seated (was standing)
+  { ...CHARACTER_CONFIGS[2], ...SEATED },          // seated (was walking)
+  { ...CHARACTER_CONFIGS[4] },                     // pointing — ops lead
+  { ...CHARACTER_CONFIGS[6] },                     // walking
+  { ...EXTRA_CONFIGS[0] },                         // walking
+  { ...EXTRA_CONFIGS[1], pose: 'standing' },       // standing supervisor
 ]
 
-// ─── Collision check ──────────────────────────────────────────────────────────
-
-function checkSpacing(defs: typeof CHARACTER_DEFS): void {
-  for (let i = 0; i < defs.length; i++) {
-    for (let j = i + 1; j < defs.length; j++) {
-      const [ax, , az] = defs[i].pos
-      const [bx, , bz] = defs[j].pos
-      const dist = Math.sqrt((ax - bx) ** 2 + (az - bz) ** 2)
-      if (dist < 2.5) {
-        console.warn(
-          `[VoxelControlRoom] Char ${i} and Char ${j} are ${dist.toFixed(2)} units apart — below 2.5 minimum`
-        )
-      }
-    }
-  }
-  console.log('[VoxelControlRoom] Character positions:')
-  defs.forEach((d, i) =>
-    console.log(`  Char ${i}: [${d.pos.map((v) => v.toFixed(1)).join(', ')}]`)
-  )
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+const CHAR_SCALE = 0.78
+// Seated characters sit on the console stools (stool top ≈ y 0.69,
+// seated hip pivot at 0.85 * scale ≈ 0.66 → group y ≈ 0.1 puts them on it)
+const SEAT_Y = 0.12
+const SEAT_Z_OFFSET = 1.05
 
 export default function VoxelControlRoom() {
   const mountRef = useRef<HTMLDivElement>(null)
@@ -69,15 +50,18 @@ export default function VoxelControlRoom() {
     if (!mountRef.current) return
     const mount = mountRef.current
 
-    // ── Renderer ──
+    // ── Renderer — filmic tone mapping + soft shadows ──
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true,
       powerPreference: 'high-performance',
     })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(800, 600)
     renderer.setClearColor('#040814', 1)
+    renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.15
     renderer.domElement.style.position = 'absolute'
     renderer.domElement.style.inset = '0'
     renderer.domElement.style.width = '100%'
@@ -88,10 +72,10 @@ export default function VoxelControlRoom() {
     // ── Scene ──
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#040814')
-    scene.fog = new THREE.Fog('#040814', 35, 95)
+    scene.fog = new THREE.Fog('#040814', 45, 110)
 
-    // ── Camera — wide cinematic arc view ──
-    const frustumSize = 34
+    // ── Camera — wide cinematic 3/4 view ──
+    const frustumSize = 33.5
     const aspect = 800 / 600
     const camera = new THREE.OrthographicCamera(
       (-frustumSize * aspect) / 2,
@@ -101,98 +85,115 @@ export default function VoxelControlRoom() {
       0.1,
       1000
     )
-    camera.position.set(15, 13, 21)
-    camera.lookAt(-0.5, 1.5, -4)
+    camera.position.set(17, 14, 22)
+    camera.lookAt(0, 4.0, -3)
 
-    // Correct size after DOM paint
-    const sizeTimeout = setTimeout(() => {
+    const applySize = () => {
       const w = mount.offsetWidth || 800
       const h = mount.offsetHeight || 600
       renderer.setSize(w, h)
+      composer.setSize(w, h)
       const a = w / h
-      camera.left   = (-frustumSize * a) / 2
-      camera.right  =  (frustumSize * a) / 2
-      camera.top    =  frustumSize / 2
+      camera.left = (-frustumSize * a) / 2
+      camera.right = (frustumSize * a) / 2
+      camera.top = frustumSize / 2
       camera.bottom = -frustumSize / 2
       camera.updateProjectionMatrix()
-    }, 100)
+    }
+    const sizeTimeout = setTimeout(applySize, 100)
 
     // ── Environment ──
     createEnvironment(scene)
 
-    // ── Collision check (dev) ──
-    checkSpacing(CHARACTER_DEFS)
+    // ── Characters ──
+    // First six sit at the consoles; the rest stand/walk on the open floor.
+    const defs: { pos: [number, number, number]; rotY: number }[] = [
+      // Seated operators face their monitors (-z), backs to the camera —
+      // classic mission-control composition.
+      ...CONSOLE_POSITIONS.map(([x, z]): { pos: [number, number, number]; rotY: number } => ({
+        pos: [x, SEAT_Y, z + SEAT_Z_OFFSET],
+        rotY: Math.PI,
+      })),
+      { pos: [8.6, 0, -3.6], rotY: Math.PI - 0.35 },  // ops lead pointing at the wall
+      { pos: [-4, 0, 2.6], rotY: Math.PI * 0.5 },   // walker lane 1
+      { pos: [4, 0, 4.6], rotY: -Math.PI * 0.5 },   // walker lane 2
+      { pos: [-8.8, 0, -0.4], rotY: 0.9 },  // standing supervisor, angled to camera
+    ]
 
-    // ── Characters — 10 total, scaled to 60% ──
-    const characters: CharacterData[] = CHARACTER_DEFS.map((def, i) => {
-      const char = createCharacter(scene, def.pos, ALL_CONFIGS[i])
-      char.group.scale.set(0.78, 0.78, 0.78)
+    const characters: CharacterData[] = defs.map((def, i) => {
+      const char = createCharacter(scene, def.pos, CONFIGS[i])
+      char.group.scale.set(CHAR_SCALE, CHAR_SCALE, CHAR_SCALE)
       char.group.rotation.y = def.rotY
       return char
+    })
+
+    // Everything voxel casts and receives shadows
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material instanceof THREE.MeshLambertMaterial) {
+        obj.castShadow = true
+      }
     })
 
     // ── Monitoring wall — dominant visual anchor ──
     const monitorCanvas = createMonitoringCanvas()
     const monitorTexture = new THREE.CanvasTexture(monitorCanvas)
+    monitorTexture.colorSpace = THREE.SRGBColorSpace
 
     const screenMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(24, 13, 0.15),
+      new THREE.BoxGeometry(20, 10.5, 0.15),
       new THREE.MeshBasicMaterial({ map: monitorTexture })
     )
-    screenMesh.position.set(-0.5, 6.5, -9.8)
+    screenMesh.position.set(0, 6.4, -9.9)
     scene.add(screenMesh)
 
-    // Emissive frame — glows cyan around the screen
-    const frameMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(24.8, 13.8, 0.08),
-      new THREE.MeshStandardMaterial({ color: 0x003366, emissive: 0x0077cc, emissiveIntensity: 2.5 })
+    // Slim glowing bezel instead of the old thick block frame
+    const bezel = new THREE.Mesh(
+      new THREE.BoxGeometry(20.7, 11.2, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0x02222e, emissive: 0x00a8d8, emissiveIntensity: 1.6 })
     )
-    frameMesh.position.set(-0.5, 6.5, -9.88)
-    scene.add(frameMesh)
-
-    // Screen-cast light — strong enough to illuminate the room
-    const screenCastLight = new THREE.PointLight(0x00ccff, 18.0, 65)
-    screenCastLight.position.set(-0.5, 7, -6.5)
-    scene.add(screenCastLight)
+    bezel.position.set(0, 6.4, -9.98)
+    scene.add(bezel)
 
     // ── Floating particles ──
-    const particleCount = 20
+    const particleCount = 26
     const particleGeometry = new THREE.BufferGeometry()
     const particlePositions = new Float32Array(particleCount * 3)
     const particleVelocities = new Float32Array(particleCount)
-    
     for (let i = 0; i < particleCount; i++) {
-      particlePositions[i * 3] = (Math.random() - 0.5) * 40
-      particlePositions[i * 3 + 1] = Math.random() * 20
-      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 40
-      particleVelocities[i] = 0.02 + Math.random() * 0.03
+      particlePositions[i * 3] = (Math.random() - 0.5) * 30
+      particlePositions[i * 3 + 1] = Math.random() * 16
+      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 22
+      particleVelocities[i] = 0.015 + Math.random() * 0.025
     }
-    
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3))
-    const particleMaterial = new THREE.PointsMaterial({
-      color: 0x00ffaa,
-      size: 0.05,
-      transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending
-    })
-    const particles = new THREE.Points(particleGeometry, particleMaterial)
+    const particles = new THREE.Points(
+      particleGeometry,
+      new THREE.PointsMaterial({
+        color: 0x4fe3c1,
+        size: 0.09,
+        transparent: true,
+        opacity: 0.55,
+        blending: THREE.AdditiveBlending,
+      })
+    )
     scene.add(particles)
 
-    // ── Resize handler ──
-    const handleResize = () => {
-      if (!mount) return
-      const w = mount.offsetWidth || 800
-      const h = mount.offsetHeight || 600
-      const a = w / h
-      renderer.setSize(w, h)
-      camera.left   = (-frustumSize * a) / 2
-      camera.right  =  (frustumSize * a) / 2
-      camera.top    =  frustumSize / 2
-      camera.bottom = -frustumSize / 2
-      camera.updateProjectionMatrix()
+    // ── Post-processing: subtle bloom sells the glow ──
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera))
+    const bloom = new UnrealBloomPass(new THREE.Vector2(800, 600), 0.55, 0.6, 0.82)
+    composer.addPass(bloom)
+
+    window.addEventListener('resize', applySize)
+
+    // ── Mouse parallax — the scene subtly follows the cursor ──
+    const pointer = { x: 0, y: 0 }
+    const pointerSmooth = { x: 0, y: 0 }
+    const handlePointer = (e: PointerEvent) => {
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1
+      pointer.y = (e.clientY / window.innerHeight) * 2 - 1
     }
-    window.addEventListener('resize', handleResize)
+    window.addEventListener('pointermove', handlePointer)
 
     // ── Animation loop ──
     const startTime = Date.now()
@@ -203,43 +204,36 @@ export default function VoxelControlRoom() {
       animId = requestAnimationFrame(animate)
       const elapsed = (Date.now() - startTime) / 1000
 
-      // 1. Camera drift
-      camera.position.x = initialCamPos.x + Math.sin(elapsed * 0.1) * 0.01
-      camera.position.y = initialCamPos.y + Math.cos(elapsed * 0.15) * 0.01
+      // Ease the pointer target for a weighty, cinematic follow
+      pointerSmooth.x += (pointer.x - pointerSmooth.x) * 0.04
+      pointerSmooth.y += (pointer.y - pointerSmooth.y) * 0.04
+
+      // Slow drift + mouse parallax
+      camera.position.x = initialCamPos.x + Math.sin(elapsed * 0.08) * 0.25 + pointerSmooth.x * 1.6
+      camera.position.y = initialCamPos.y + Math.cos(elapsed * 0.11) * 0.15 - pointerSmooth.y * 1.0
+      camera.lookAt(0, 4.0, -3)
 
       updateCharacters(characters, elapsed)
 
-      // Char 7 — left-right patrol on z=3 lane (never touches z=1 lane)
-      const c7vel = Math.cos(elapsed * 0.25)
-      characters[7].group.position.x = -5 + 3 * Math.sin(elapsed * 0.25)
-      characters[7].group.position.z = 3
-      characters[7].group.rotation.y = c7vel > 0 ? Math.PI * 0.5 : -Math.PI * 0.5
+      // Walkers patrol separate z-lanes behind the consoles
+      const c7 = characters[7]
+      const c7vel = Math.cos(elapsed * 0.22)
+      c7.group.position.x = -4 + 3.4 * Math.sin(elapsed * 0.22)
+      c7.group.position.z = 2.6
+      c7.group.rotation.y = c7vel > 0 ? Math.PI * 0.5 : -Math.PI * 0.5
 
-      // Char 8 — left-right patrol on z=1 lane (different phase so they're out of sync)
-      const c8vel = Math.cos(elapsed * 0.2)
-      characters[8].group.position.x = 5 + 2.5 * Math.sin(elapsed * 0.2)
-      characters[8].group.position.z = 1
-      characters[8].group.rotation.y = c8vel > 0 ? Math.PI * 0.5 : -Math.PI * 0.5
+      const c8 = characters[8]
+      const c8vel = Math.cos(elapsed * 0.17)
+      c8.group.position.x = 4 + 3 * Math.sin(elapsed * 0.17)
+      c8.group.position.z = 4.6
+      c8.group.rotation.y = c8vel > 0 ? Math.PI * 0.5 : -Math.PI * 0.5
 
       updateEnvironment(elapsed)
 
       updateMonitoringCanvas(monitorCanvas, elapsed)
       monitorTexture.needsUpdate = true
 
-      // 2. Screen pulse glow
-      screenCastLight.intensity = 12 + Math.sin(elapsed * 2) * 2
-
-      // 3. Update particles
-      const positions = particleGeometry.attributes.position.array as Float32Array
-      for (let i = 0; i < particleCount; i++) {
-        positions[i * 3 + 1] += particleVelocities[i]
-        if (positions[i * 3 + 1] > 20) {
-          positions[i * 3 + 1] = -5
-        }
-      }
-      particleGeometry.attributes.position.needsUpdate = true
-
-      renderer.render(scene, camera)
+      composer.render()
     }
 
     animate()
@@ -247,9 +241,11 @@ export default function VoxelControlRoom() {
     // ── Cleanup ──
     return () => {
       clearTimeout(sizeTimeout)
-      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('resize', applySize)
+      window.removeEventListener('pointermove', handlePointer)
       cancelAnimationFrame(animId)
       monitorTexture.dispose()
+      composer.dispose()
       renderer.dispose()
       if (mount.contains(renderer.domElement)) {
         mount.removeChild(renderer.domElement)
