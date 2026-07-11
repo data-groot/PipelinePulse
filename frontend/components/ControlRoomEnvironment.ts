@@ -152,7 +152,7 @@ function makeWingTexture(accent: string): THREE.CanvasTexture {
 
 function buildWingScreens(scene: THREE.Scene) {
   const defs: { x: number; rotY: number; accent: string }[] = [
-    { x: -11.2, rotY: 0.62, accent: '#2ee6c8' },
+    { x: -11.2, rotY: 0.62, accent: '#a78bfa' },
     { x: 11.2, rotY: -0.62, accent: '#ffb454' },
   ]
   for (const { x, rotY, accent } of defs) {
@@ -350,10 +350,10 @@ function buildLighting(scene: THREE.Scene) {
   amber.position.set(10, 5, -6)
   scene.add(amber)
 
-  // Teal accent from the left wing screen
-  const teal = new THREE.PointLight(0x2ee6c8, 22, 26, 1.9)
-  teal.position.set(-10, 5, -6)
-  scene.add(teal)
+  // Violet accent from the left wing screen
+  const violet = new THREE.PointLight(0x8b7cff, 24, 26, 1.9)
+  violet.position.set(-10, 5, -6)
+  scene.add(violet)
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

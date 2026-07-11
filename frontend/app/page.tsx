@@ -27,6 +27,7 @@ import {
   StaggerItem,
   WordReveal,
 } from '@/components/landing-motion';
+import Starfield from '@/components/Starfield';
 
 const GITHUB_URL = 'https://github.com/data-groot/PipelinePulse';
 
@@ -285,8 +286,10 @@ export default function HomePage() {
       <div className="landing-background" aria-hidden="true">
         <div className="landing-orb orb-left" />
         <div className="landing-orb orb-right" />
-        <div className="landing-grid" />
+        <div className="landing-orb orb-bottom" />
       </div>
+
+      <Starfield />
 
       <nav className={`landing-nav fixed top-0 left-0 right-0 z-50 ${scrolled ? 'nav-scrolled' : ''}`}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -320,7 +323,7 @@ export default function HomePage() {
                 key={label}
                 type="button"
                 onClick={() => id ? scrollTo(id) : window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="text-sm text-gray-400 hover:text-emerald-400 transition-colors font-mono uppercase tracking-wider bg-transparent border-0 cursor-pointer"
+                className="text-sm text-gray-400 hover:text-violet-300 transition-colors font-mono uppercase tracking-wider bg-transparent border-0 cursor-pointer"
               >
                 {label}
               </button>
@@ -334,20 +337,20 @@ export default function HomePage() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="View source on GitHub"
-              className="flex items-center gap-2 text-sm text-gray-300 hover:text-emerald-400 transition-colors font-mono uppercase tracking-wider"
+              className="flex items-center gap-2 text-sm text-gray-300 hover:text-violet-300 transition-colors font-mono uppercase tracking-wider"
             >
               <Github size={16} />
               GitHub
             </a>
             <Link
               href="/login"
-              className="text-sm text-gray-300 hover:text-emerald-400 transition-colors font-mono uppercase tracking-wider"
+              className="text-sm text-gray-300 hover:text-violet-300 transition-colors font-mono uppercase tracking-wider"
             >
               Log in
             </Link>
             <Link
               href="/signup"
-              className="text-sm font-mono uppercase tracking-wider px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+              className="text-sm font-mono uppercase tracking-wider px-4 py-2 rounded-lg bg-violet-500/15 border border-violet-400/40 text-violet-200 hover:bg-violet-500/25 transition-colors"
             >
               Try the demo
             </Link>
@@ -393,7 +396,7 @@ export default function HomePage() {
               delay={0.62}
               className="gradient-shimmer"
               style={{
-                background: 'linear-gradient(90deg, #36e2b8 0%, #0eb5c8 40%, #7fd8ff 60%, #36e2b8 100%)',
+                background: 'linear-gradient(90deg, #a78bfa 0%, #7cc8ff 35%, #4ff0c8 65%, #a78bfa 100%)',
                 backgroundSize: '200% 100%',
                 WebkitBackgroundClip: 'text',
                 backgroundClip: 'text',
@@ -619,10 +622,14 @@ export default function HomePage() {
           min-height: 100vh;
           overflow: clip;
           background:
-            radial-gradient(circle at 68% 55%, rgba(30, 160, 200, 0.10), transparent 32%),
-            radial-gradient(circle at 20% 65%, rgba(20, 107, 255, 0.09), transparent 28%),
-            linear-gradient(180deg, #040815 0%, #050c1a 30%, #060c1b 60%, #07101e 100%);
+            radial-gradient(circle at 70% 20%, rgba(110, 84, 255, 0.10), transparent 34%),
+            radial-gradient(circle at 18% 70%, rgba(38, 118, 255, 0.08), transparent 30%),
+            linear-gradient(180deg, #030409 0%, #05060f 35%, #060714 65%, #070816 100%);
           color: #f5f7fb;
+        }
+        .landing-shell > *:not(.landing-background) {
+          position: relative;
+          z-index: 1;
         }
 
         .landing-background {
@@ -639,31 +646,29 @@ export default function HomePage() {
           opacity: 0.7;
         }
 
+        /* Nebula glows floating behind the starfield */
         .orb-left {
           top: 10rem;
           left: -6rem;
-          width: 22rem;
-          height: 22rem;
-          background: rgba(21, 98, 255, 0.2);
+          width: 26rem;
+          height: 26rem;
+          background: rgba(124, 92, 255, 0.16);
         }
 
         .orb-right {
           top: 2rem;
           right: -4rem;
-          width: 28rem;
-          height: 28rem;
-          background: rgba(48, 214, 173, 0.18);
+          width: 30rem;
+          height: 30rem;
+          background: rgba(46, 134, 255, 0.13);
         }
 
-        .landing-grid {
-          position: absolute;
-          inset: 0;
-          background-image:
-            linear-gradient(to right, rgba(84, 116, 180, 0.06) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(84, 116, 180, 0.04) 1px, transparent 1px);
-          background-size: 72px 72px;
-          mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.9) 15%, rgba(0, 0, 0, 0.9) 75%, transparent);
-          opacity: 0.45;
+        .orb-bottom {
+          bottom: -10rem;
+          left: 35%;
+          width: 34rem;
+          height: 24rem;
+          background: rgba(79, 240, 200, 0.07);
         }
 
         .site-header {
@@ -800,9 +805,9 @@ export default function HomePage() {
           gap: 0.6rem;
           padding: 0.45rem 0.85rem;
           border-radius: 999px;
-          border: 1px solid rgba(50, 214, 173, 0.25);
-          background: rgba(10, 28, 33, 0.5);
-          color: #6eedc0;
+          border: 1px solid rgba(147, 122, 255, 0.3);
+          background: rgba(20, 16, 44, 0.5);
+          color: #b8a4ff;
           font-family: var(--font-jetbrains), monospace;
           font-size: 0.78rem;
           letter-spacing: 0.14em;
@@ -875,9 +880,9 @@ export default function HomePage() {
           position: relative;
           overflow: hidden;
           padding: 0.95rem 1.4rem;
-          color: #041610;
-          background: linear-gradient(135deg, #2cff98 0%, #22d6a2 58%, #18b7af 100%);
-          box-shadow: 0 18px 50px rgba(34, 214, 162, 0.28);
+          color: #06040f;
+          background: linear-gradient(135deg, #a78bfa 0%, #6ea8ff 48%, #34e3c0 100%);
+          box-shadow: 0 18px 50px rgba(124, 92, 255, 0.3);
         }
 
         .primary-cta::after {
@@ -897,7 +902,7 @@ export default function HomePage() {
         }
 
         .primary-cta:hover {
-          box-shadow: 0 20px 60px rgba(34, 214, 162, 0.45);
+          box-shadow: 0 20px 60px rgba(124, 92, 255, 0.5), 0 0 30px rgba(79, 240, 200, 0.2);
         }
 
         .primary-cta:hover,
@@ -1068,7 +1073,7 @@ export default function HomePage() {
           left: 12%;
           right: 12%;
           height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(54, 226, 184, 0.55), transparent);
+          background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.6), rgba(79, 240, 200, 0.4), transparent);
           opacity: 0;
           transition: opacity 260ms ease;
         }
@@ -1076,8 +1081,8 @@ export default function HomePage() {
         .capability-card:hover,
         .signal-card:hover {
           transform: translateY(-6px);
-          border-color: rgba(54, 226, 184, 0.35);
-          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3), 0 0 40px rgba(34, 214, 162, 0.09);
+          border-color: rgba(147, 122, 255, 0.4);
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3), 0 0 44px rgba(124, 92, 255, 0.13);
         }
 
         .capability-card:hover::before,
@@ -1529,9 +1534,9 @@ export default function HomePage() {
           transition: background 320ms ease, border-color 320ms ease, backdrop-filter 320ms ease;
         }
         .landing-nav.nav-scrolled {
-          background: rgba(3, 7, 18, 0.72);
+          background: rgba(4, 5, 14, 0.72);
           backdrop-filter: blur(14px);
-          border-bottom-color: rgba(54, 226, 184, 0.12);
+          border-bottom-color: rgba(147, 122, 255, 0.16);
         }
 
         /* ── Headline gradient shimmer ── */
@@ -1574,7 +1579,7 @@ export default function HomePage() {
         .marquee-dot {
           margin: 0 1.6rem;
           font-size: 0.45rem;
-          color: rgba(54, 226, 184, 0.55);
+          color: rgba(167, 139, 250, 0.6);
         }
         @keyframes marquee-scroll {
           to { transform: translateX(-50%); }
@@ -1643,8 +1648,8 @@ export default function HomePage() {
 
         .how-step:hover {
           transform: translateY(-6px);
-          border-color: rgba(54, 226, 184, 0.35);
-          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3), 0 0 40px rgba(34, 214, 162, 0.09);
+          border-color: rgba(147, 122, 255, 0.4);
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3), 0 0 44px rgba(124, 92, 255, 0.13);
         }
         .step-number {
           font-family: var(--font-jetbrains), monospace;
