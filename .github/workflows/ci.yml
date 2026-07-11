@@ -1,43 +1,61 @@
-name: PipelinePulse CI/CD
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main, v2]
   pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  backend-tests:
     runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt pytest pytest-asyncio aiosqlite respx
+        working-directory: backend
+      - run: python -m pytest -q
+        working-directory: backend
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
 
-    - name: Install Frontend Dependencies
-      run: npm ci
-      working-directory: frontend
-
-    - name: Lint & Build Frontend
-      run: npm run build
-      working-directory: frontend
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-
-    - name: Install Backend Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-      working-directory: backend
-
-    - name: Verify Docker Compose Build
-      run: docker compose build
+  deploy-backend:
+    # Deploys to Cloud Run on push to main. Requires the GCP_SA_KEY repo secret
+    # (service account JSON with Cloud Run + Cloud Build roles) and the
+    # GCP_PROJECT_ID repo variable. Does nothing until those are configured.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [backend-tests, frontend-build]
+    runs-on: ubuntu-latest
+    env:
+      HAS_GCP_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: env.HAS_GCP_KEY == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - if: env.HAS_GCP_KEY == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+      - if: env.HAS_GCP_KEY == 'true'
+        run: |
+          gcloud run deploy pipelinepulse-api \
+            --source backend \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region us-east4 \
+            --allow-unauthenticated \
+            --quiet

@@ -40,7 +40,7 @@ const heroHighlights = [
   { label: 'Control-Room Interface', detail: 'Live 3D operator scene' },
   { label: 'Observability Wall', detail: 'Real-time dashboard feed' },
   { label: 'Bronze → Silver → Gold', detail: 'Medallion data flow' },
-  { label: 'Monitoring + Automation', detail: 'Alerts & DAG scheduling' },
+  { label: 'Monitoring + Automation', detail: 'Quality scores & cloud scheduling' },
 ];
 
 const capabilityCards = [
@@ -51,13 +51,13 @@ const capabilityCards = [
   },
   {
     icon: Bot,
-    title: 'Airflow orchestration',
-    description: 'A DAG factory generates pipelines from config. Bronze-to-gold movement is coordinated automatically, no manual triggers needed.',
+    title: 'Cloud-native scheduling',
+    description: 'Pipelines run on schedule via Cloud Scheduler and Cloud Run — serverless, scale-to-zero. Bronze-to-gold movement happens automatically, no manual triggers needed.',
   },
   {
     icon: ShieldCheck,
     title: 'Quality layer',
-    description: 'Automated checks run after each dbt transformation. Drift, null spikes, and schema breaks caught before they propagate downstream.',
+    description: 'Automated checks score every run — row counts, null payloads, duplicates, and freshness caught before they propagate downstream.',
   },
 ];
 
@@ -182,9 +182,9 @@ function DashboardPanel() {
           <div className="panel-stat">14</div>
           <div className="panel-substat">3 queued, 11 executing</div>
           <div className="panel-runlist">
-            <span>Run team</span>
-            <span>Airflow bronze</span>
-            <span>dbt gold</span>
+            <span>Run feed</span>
+            <span>Bronze extract</span>
+            <span>Gold rollup</span>
           </div>
         </section>
 
@@ -314,6 +314,22 @@ export default function HomePage() {
             ))}
           </div>
 
+          {/* Auth actions */}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="text-sm text-gray-300 hover:text-emerald-400 transition-colors font-mono uppercase tracking-wider"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="text-sm font-mono uppercase tracking-wider px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+            >
+              Get started
+            </Link>
+          </div>
+
         </div>
       </nav>
 
@@ -333,7 +349,7 @@ export default function HomePage() {
           <div className="inline-block">
             <span className="eyebrow">
               <span className="eyebrow-dot" />
-              CONCEPT PROJECT · DATA ENGINEERING
+              LIVE PLATFORM · DATA ENGINEERING
             </span>
           </div>
 
@@ -365,10 +381,20 @@ export default function HomePage() {
             className="animate-fade-in-up animation-delay-200"
             style={{ marginTop: '1rem', color: 'rgba(214, 224, 240, 0.76)', fontSize: '1.05rem', lineHeight: 1.8, maxWidth: '30rem' }}
           >
-            A concept project exploring data pipeline monitoring through a mission-control interface.
-            Designed for data engineers who think in systems.
+            Connect a data source, pick a schedule, and watch your data move bronze → silver → gold —
+            with quality scores and live run telemetry. No Airflow, no YAML, no data team required.
           </p>
 
+          <div className="hero-actions animate-fade-in-up animation-delay-200" style={{ marginTop: '1.5rem' }}>
+            <Link href="/signup" className="primary-cta">
+              Start free
+              <ChevronRight size={16} />
+            </Link>
+            <button type="button" className="secondary-cta" style={{ cursor: 'pointer' }} onClick={() => scrollTo('how-it-works')}>
+              See the architecture
+              <ArrowRight size={16} />
+            </button>
+          </div>
 
         </div>
 
@@ -442,21 +468,21 @@ export default function HomePage() {
         <div className="section-heading">
           <div className="section-kicker">Data Architecture</div>
           <h2>Medallion architecture — bronze to gold in three layers.</h2>
-          <p>The system implements a classic medallion pattern: raw ingestion, dbt-powered transformation, and quality-gated delivery. PipelinePulse surfaces the full lifecycle.</p>
+          <p>The system implements a classic medallion pattern: raw ingestion, cleaning and typing, and quality-gated daily aggregates. PipelinePulse surfaces the full lifecycle.</p>
         </div>
         <div className="how-steps">
           <div className="how-step">
             <div className="step-number">01 — Bronze</div>
             <div className="step-icon"><Database size={20} /></div>
             <h3>Raw ingestion</h3>
-            <p>Source data lands in a per-user bronze schema. Airflow tracks row counts, freshness windows, and ingestion latency per DAG run.</p>
+            <p>Source data lands unchanged in the bronze layer — REST APIs, PostgreSQL tables, or CSV uploads. Every run records row counts and freshness.</p>
           </div>
           <div className="step-connector"><ArrowRight size={22} /></div>
           <div className="how-step">
             <div className="step-number">02 — Silver</div>
             <div className="step-icon"><Activity size={20} /></div>
-            <h3>dbt transformation</h3>
-            <p>dbt models reshape and validate bronze data. Automated quality checks flag null ratios, type drift, and broken contracts before they propagate downstream.</p>
+            <h3>Silver transformation</h3>
+            <p>Bronze data is cleaned, deduplicated, and typed into the silver layer. Automated quality checks flag null payloads, duplicates, and stale data before they propagate downstream.</p>
           </div>
           <div className="step-connector"><ArrowRight size={22} /></div>
           <div className="how-step">
@@ -471,12 +497,12 @@ export default function HomePage() {
       {/* ── Project CTA ── */}
       <section className="cta-section section-fade-in">
         <div className="cta-card">
-          <div className="section-kicker">Explore the Project</div>
-          <h2>A visual experiment in pipeline observability.</h2>
-          <p>PipelinePulse explores what a cinematic, operator-grade interface for data pipeline monitoring could look like. Built with FastAPI, Airflow, dbt, and Next.js.</p>
+          <div className="section-kicker">Get Started</div>
+          <h2>Your first pipeline can be running in two minutes.</h2>
+          <p>Sign up, load the sample pipeline or connect your own source, and watch the control room light up. Built with FastAPI, Next.js, PostgreSQL, and Google Cloud Run.</p>
           <div className="hero-actions cta-actions" style={{ marginTop: '2rem' }}>
-            <Link href="/pipelines" className="primary-cta">
-              Explore the Interface
+            <Link href="/signup" className="primary-cta">
+              Create your account
               <ChevronRight size={16} />
             </Link>
             <button type="button" className="secondary-cta" style={{ cursor: 'pointer' }} onClick={() => scrollTo('how-it-works')}>
@@ -493,7 +519,7 @@ export default function HomePage() {
           <div className="footer-inner">
             <div className="footer-brand">
               <BrandMark />
-              <p>A concept project exploring pipeline observability through a cinematic mission-control interface. Built with FastAPI, Apache Airflow, dbt-core, PostgreSQL, and Next.js 15.</p>
+              <p>Self-serve pipeline observability with a cinematic mission-control interface. Built with FastAPI, Next.js, PostgreSQL, and Google Cloud Run.</p>
             </div>
             <div className="footer-col">
               <h4>Project</h4>
@@ -508,9 +534,9 @@ export default function HomePage() {
               <h4>Stack</h4>
               <ul>
                 <li>FastAPI + Python</li>
-                <li>Apache Airflow</li>
-                <li>dbt-core</li>
-                <li>Next.js 15</li>
+                <li>PostgreSQL</li>
+                <li>Google Cloud Run</li>
+                <li>Next.js</li>
               </ul>
             </div>
             <div className="footer-col">
@@ -523,7 +549,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="footer-bottom">
-            <span>PipelinePulse — a concept project in data engineering observability.</span>
+            <span>PipelinePulse — pipeline observability for teams without a data platform.</span>
           </div>
         </div>
       </footer>

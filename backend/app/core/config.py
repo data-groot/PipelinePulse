@@ -1,33 +1,23 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file="../.env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
-
-    # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/pipelinepulse"
-
-    # JWT
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = "dev-secret-do-not-use-in-prod"
     jwt_algorithm: str = "HS256"
-    jwt_expiry_minutes: int = 60
-
-    # Encryption — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    jwt_expiry_minutes: int = 60 * 24
     fernet_key: str = ""
+    scheduler_secret: str = "dev-scheduler-secret"
+    cookie_secure: bool = False
 
-    # API Keys
-    openweather_api_key: str = ""
-    github_token: str = ""
+    # Safety caps on extraction, matching v1 behavior
+    max_extract_rows: int = 1000
+    max_extract_pages: int = 5
+    max_csv_bytes: int = 10 * 1024 * 1024
 
-    # App
-    app_env: str = "development"
-    debug: bool = True
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 @lru_cache

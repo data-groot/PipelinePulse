@@ -1,160 +1,20 @@
-services:
 
-  # ── PostgreSQL 16 ────────────────────────────────────────────
+services:
   postgres:
     image: postgres:16-alpine
-    container_name: pipelinepulse-postgres
-    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-pipelinepulse}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pipelinepulse
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pipelinepulse}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
       timeout: 5s
       retries: 5
-
-  # ── FastAPI Backend ──────────────────────────────────────────
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: pipelinepulse-backend
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-pipelinepulse}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
-      JWT_ALGORITHM: HS256
-      JWT_EXPIRY_MINUTES: 60
-      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      DEBUG: "true"
-      FERNET_KEY: ${FERNET_KEY}
-      AIRFLOW_URL: http://airflow-webserver:8080/api/v1
-      AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-admin}
-      AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./backend:/app
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ── Next.js Frontend ─────────────────────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: pipelinepulse-frontend
-    restart: unless-stopped
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-      NEXT_PUBLIC_WS_URL: ws://localhost:8000
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-
-  # ── dbt Runner ───────────────────────────────────────────────
-  dbt-runner:
-    image: ghcr.io/dbt-labs/dbt-postgres:1.7.latest  # Keeping to highly stable 1.7 layer natively
-    container_name: pipelinepulse-dbt
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DBT_HOST: postgres
-      DBT_USER: ${POSTGRES_USER:-postgres}
-      DBT_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DBT_PORT: 5432
-      DBT_DATABASE: ${POSTGRES_DB:-pipelinepulse}
-    volumes:
-      - ./dbt:/usr/app
-    working_dir: /usr/app
-
-  # ── Airflow ──────────────────────────────────────────────────
-  airflow-webserver:
-    build: ./airflow
-    container_name: pipelinepulse-airflow-web
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/airflow
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      # Static Fernet key — safe dev default, override in production via .env
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=}
-      # Static webserver secret key — prevents session invalidation on restart
-      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-pipelinepulse-dev-webserver-secret}
-      # Enable basic auth for the REST API so the backend can trigger DAGs programmatically
-      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
-      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-pipelinepulse}
-      - DBT_LOG_PATH=/tmp/dbt_logs
-      - DBT_TARGET_PATH=/tmp/dbt_target
-      - FERNET_KEY=${FERNET_KEY}
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./dbt:/opt/airflow/dbt
-    command:
-      - bash
-      - -c
-      - |
-        PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='airflow'" | grep -q 1 || PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -c "CREATE DATABASE airflow" &&
-        airflow db migrate &&
-        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com 2>/dev/null || true &&
-        airflow webserver
-
-  airflow-scheduler:
-    build: ./airflow
-    container_name: pipelinepulse-airflow-scheduler
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/airflow
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      # Must match webserver Fernet key so encrypted values round-trip correctly
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZeZyPs=}
-      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-pipelinepulse-dev-webserver-secret}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-pipelinepulse}
-      - DBT_LOG_PATH=/tmp/dbt_logs
-      - DBT_TARGET_PATH=/tmp/dbt_target
-      - DBT_HOST=postgres
-      - DBT_USER=${POSTGRES_USER:-postgres}
-      - DBT_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - DBT_DATABASE=${POSTGRES_DB:-pipelinepulse}
-      - DBT_PORT=5432
-      - FERNET_KEY=${FERNET_KEY}
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./dbt:/opt/airflow/dbt
-    command:
-      - bash
-      - -c
-      - |
-        PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='airflow'" | grep -q 1 || PGPASSWORD=${POSTGRES_PASSWORD:-postgres} psql -h postgres -U ${POSTGRES_USER:-postgres} -d postgres -c "CREATE DATABASE airflow" &&
-        airflow db migrate &&
-        airflow scheduler
 
 volumes:
   postgres_data:
