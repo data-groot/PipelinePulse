@@ -3,7 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 const PROTECTED_PATHS = ['/dashboard', '/pipelines', '/quality'];
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+
+  // Forward API + auth calls to the backend. BACKEND_URL is read here at
+  // request time (not in next.config rewrites, which are frozen into the
+  // build), so the same container image works locally and on Cloud Run.
+  if (pathname.startsWith('/api/') || pathname.startsWith('/auth/')) {
+    const backend = process.env.BACKEND_URL || 'http://localhost:8000';
+    return NextResponse.rewrite(new URL(`${pathname}${search}`, backend));
+  }
 
   const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p));
   const token = request.cookies.get('access_token');
@@ -23,5 +31,13 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/pipelines/:path*', '/quality/:path*', '/login', '/signup'],
+  matcher: [
+    '/api/:path*',
+    '/auth/:path*',
+    '/dashboard/:path*',
+    '/pipelines/:path*',
+    '/quality/:path*',
+    '/login',
+    '/signup',
+  ],
 };

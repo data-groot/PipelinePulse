@@ -1,14 +1,8 @@
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
-
 const nextConfig: import('next').NextConfig = {
-  // Standalone build for the Cloud Run container image
+  // Standalone build for the Cloud Run container image.
+  // API/auth proxying lives in middleware.ts so BACKEND_URL is read at
+  // request time, not baked in at build time.
   output: 'standalone',
-  async rewrites() {
-    return [
-      { source: '/auth/:path*', destination: `${BACKEND_URL}/auth/:path*` },
-      { source: '/api/:path*', destination: `${BACKEND_URL}/api/:path*` },
-    ];
-  },
 };
 
 export default nextConfig;
