@@ -186,6 +186,15 @@ export default function VoxelControlRoom() {
 
     window.addEventListener('resize', applySize)
 
+    // ── Mouse parallax — the scene subtly follows the cursor ──
+    const pointer = { x: 0, y: 0 }
+    const pointerSmooth = { x: 0, y: 0 }
+    const handlePointer = (e: PointerEvent) => {
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1
+      pointer.y = (e.clientY / window.innerHeight) * 2 - 1
+    }
+    window.addEventListener('pointermove', handlePointer)
+
     // ── Animation loop ──
     const startTime = Date.now()
     const initialCamPos = camera.position.clone()
@@ -195,9 +204,13 @@ export default function VoxelControlRoom() {
       animId = requestAnimationFrame(animate)
       const elapsed = (Date.now() - startTime) / 1000
 
-      // Slow cinematic drift
-      camera.position.x = initialCamPos.x + Math.sin(elapsed * 0.08) * 0.25
-      camera.position.y = initialCamPos.y + Math.cos(elapsed * 0.11) * 0.15
+      // Ease the pointer target for a weighty, cinematic follow
+      pointerSmooth.x += (pointer.x - pointerSmooth.x) * 0.04
+      pointerSmooth.y += (pointer.y - pointerSmooth.y) * 0.04
+
+      // Slow drift + mouse parallax
+      camera.position.x = initialCamPos.x + Math.sin(elapsed * 0.08) * 0.25 + pointerSmooth.x * 1.6
+      camera.position.y = initialCamPos.y + Math.cos(elapsed * 0.11) * 0.15 - pointerSmooth.y * 1.0
       camera.lookAt(0, 4.0, -3)
 
       updateCharacters(characters, elapsed)
@@ -229,6 +242,7 @@ export default function VoxelControlRoom() {
     return () => {
       clearTimeout(sizeTimeout)
       window.removeEventListener('resize', applySize)
+      window.removeEventListener('pointermove', handlePointer)
       cancelAnimationFrame(animId)
       monitorTexture.dispose()
       composer.dispose()
