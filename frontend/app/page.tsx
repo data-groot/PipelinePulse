@@ -12,11 +12,38 @@ import {
   Clock3,
   Database,
   Eye,
+  Github,
   ShieldCheck,
   Sparkles,
   Waves,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import {
+  Magnetic,
+  Marquee,
+  Reveal,
+  RiseIn,
+  StaggerGroup,
+  StaggerItem,
+  WordReveal,
+} from '@/components/landing-motion';
+
+const GITHUB_URL = 'https://github.com/data-groot/PipelinePulse';
+
+const STACK_ITEMS = [
+  'FastAPI',
+  'Next.js 16',
+  'PostgreSQL',
+  'Cloud Run',
+  'Cloud Scheduler',
+  'SQLAlchemy',
+  'TanStack Query',
+  'Three.js',
+  'Tailwind v4',
+  'Python 3.12',
+  'TypeScript',
+  'Docker',
+];
 
 const VoxelControlRoom = dynamic(() => import('@/components/VoxelControlRoom'), {
   ssr: false,
@@ -253,29 +280,6 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => {
-    const observerOptions = {
-      root: null,
-      rootMargin: '0px',
-      threshold: 0.1,
-    };
-
-    const handleIntersect = (entries: IntersectionObserverEntry[], observer: IntersectionObserver) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          observer.unobserve(entry.target);
-        }
-      });
-    };
-
-    const observer = new IntersectionObserver(handleIntersect, observerOptions);
-    const sections = document.querySelectorAll('.section-fade-in');
-    sections.forEach((section) => observer.observe(section));
-
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <main className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} landing-shell`}>
       <div className="landing-background" aria-hidden="true">
@@ -323,8 +327,18 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Auth actions */}
-          <div className="flex items-center gap-3">
+          {/* Actions */}
+          <div className="flex items-center gap-6">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="View source on GitHub"
+              className="flex items-center gap-2 text-sm text-gray-300 hover:text-emerald-400 transition-colors font-mono uppercase tracking-wider"
+            >
+              <Github size={16} />
+              GitHub
+            </a>
             <Link
               href="/login"
               className="text-sm text-gray-300 hover:text-emerald-400 transition-colors font-mono uppercase tracking-wider"
@@ -335,7 +349,7 @@ export default function HomePage() {
               href="/signup"
               className="text-sm font-mono uppercase tracking-wider px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors"
             >
-              Get started
+              Try the demo
             </Link>
           </div>
 
@@ -355,15 +369,14 @@ export default function HomePage() {
         {/* Text — left column */}
         <div className="absolute z-20 top-[15%] left-[5%] space-y-6" style={{ maxWidth: '42%' }}>
 
-          <div className="inline-block">
+          <Reveal delay={0.05} y={16} className="inline-block">
             <span className="eyebrow">
               <span className="eyebrow-dot" />
-              LIVE PLATFORM · DATA ENGINEERING
+              OPEN SOURCE · DATA ENGINEERING
             </span>
-          </div>
+          </Reveal>
 
           <h1
-            className="animate-fade-in-up"
             style={{
               marginTop: '1rem',
               fontFamily: 'var(--font-space-grotesk), sans-serif',
@@ -375,36 +388,46 @@ export default function HomePage() {
               textTransform: 'uppercase',
             }}
           >
-            A cinematic control room for{' '}
-            <span className="gradient-shimmer" style={{
-              background: 'linear-gradient(90deg, #36e2b8 0%, #0eb5c8 40%, #7fd8ff 60%, #36e2b8 100%)',
-              backgroundSize: '200% 100%',
-              WebkitBackgroundClip: 'text',
-              backgroundClip: 'text',
-              color: 'transparent',
-            }}>
+            <WordReveal text="A cinematic control room for" delay={0.15} />{' '}
+            <RiseIn
+              delay={0.62}
+              className="gradient-shimmer"
+              style={{
+                background: 'linear-gradient(90deg, #36e2b8 0%, #0eb5c8 40%, #7fd8ff 60%, #36e2b8 100%)',
+                backgroundSize: '200% 100%',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent',
+              }}
+            >
               pipeline observability.
-            </span>
+            </RiseIn>
           </h1>
 
-          <p
-            className="animate-fade-in-up animation-delay-200"
-            style={{ marginTop: '1rem', color: 'rgba(214, 224, 240, 0.76)', fontSize: '1.05rem', lineHeight: 1.8, maxWidth: '30rem' }}
-          >
-            Connect a data source, pick a schedule, and watch your data move bronze → silver → gold —
-            with quality scores and live run telemetry. No Airflow, no YAML, no data team required.
-          </p>
+          <Reveal delay={0.8} y={22}>
+            <p style={{ marginTop: '1rem', color: 'rgba(214, 224, 240, 0.76)', fontSize: '1.05rem', lineHeight: 1.8, maxWidth: '30rem' }}>
+              An open-source ETL platform you can run yourself. Connect a data source, pick a
+              schedule, and watch your data move bronze → silver → gold with quality scores and
+              live run telemetry. No Airflow, no YAML.
+            </p>
+          </Reveal>
 
-          <div className="hero-actions animate-fade-in-up animation-delay-200" style={{ marginTop: '1.5rem' }}>
-            <Link href="/signup" className="primary-cta">
-              Start free
-              <ChevronRight size={16} />
-            </Link>
-            <button type="button" className="secondary-cta" style={{ cursor: 'pointer' }} onClick={() => scrollTo('how-it-works')}>
-              See the architecture
-              <ArrowRight size={16} />
-            </button>
-          </div>
+          <Reveal delay={0.95} y={22}>
+            <div className="hero-actions" style={{ marginTop: '1.5rem' }}>
+              <Magnetic>
+                <Link href="/signup" className="primary-cta">
+                  Try the live demo
+                  <ChevronRight size={16} />
+                </Link>
+              </Magnetic>
+              <Magnetic>
+                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="secondary-cta">
+                  <Github size={16} />
+                  View on GitHub
+                </a>
+              </Magnetic>
+            </div>
+          </Reveal>
 
         </div>
 
@@ -426,24 +449,29 @@ export default function HomePage() {
 
       </section>
 
-      <section id="platform" className="capability-section section-fade-in">
-        <div className="section-heading">
+      {/* ── Stack ticker ── */}
+      <Marquee items={STACK_ITEMS} />
+
+      <section id="platform" className="capability-section">
+        <Reveal className="section-heading">
           <div className="section-kicker">Interface Design</div>
           <h2>Designed as a mission-control surface for modern data workflows.</h2>
           <p>
             Each panel is intentionally designed — not auto-generated — to surface the signals a pipeline operator actually needs. Information hierarchy over decoration.
           </p>
-        </div>
+        </Reveal>
 
-        <div className="capability-grid">
+        <StaggerGroup className="capability-grid">
           {capabilityCards.map((card) => (
-            <CapabilityCard key={card.title} {...card} />
+            <StaggerItem key={card.title}>
+              <CapabilityCard {...card} />
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerGroup>
       </section>
 
-      <section id="solutions" className="preview-section section-fade-in">
-        <div className="preview-copy">
+      <section id="solutions" className="preview-section">
+        <Reveal className="preview-copy">
           <div className="section-kicker">UI Preview</div>
           <h2>The control center interface, built panel by panel.</h2>
           <p>
@@ -452,92 +480,114 @@ export default function HomePage() {
 
           <div className="bullet-list">
             <div><CheckCircle2 size={16} /> Pipeline health in three labeled progress bars</div>
-            <div><Clock3 size={16} /> Countdown timer to the next scheduled DAG run</div>
+            <div><Clock3 size={16} /> Countdown timer to the next scheduled run</div>
             <div><Sparkles size={16} /> Quality gauges rendered front and center</div>
           </div>
-        </div>
+        </Reveal>
 
-        <DashboardPanel />
+        <Reveal delay={0.18} y={48}>
+          <DashboardPanel />
+        </Reveal>
       </section>
 
-      <section id="pricing" className="signals-section section-fade-in">
-        <div className="section-heading compact">
+      <section id="signals" className="signals-section">
+        <Reveal className="section-heading compact">
           <div className="section-kicker">Signal Design</div>
           <h2>Three signal layers, each surfacing a different dimension of pipeline state.</h2>
-        </div>
+        </Reveal>
 
-        <div className="signals-grid">
+        <StaggerGroup className="signals-grid">
           {signalCards.map((card) => (
-            <SignalCard key={card.title} {...card} />
+            <StaggerItem key={card.title}>
+              <SignalCard {...card} />
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerGroup>
       </section>
 
       {/* ── Architecture ── */}
-      <section id="how-it-works" className="how-section section-fade-in">
-        <div className="section-heading">
+      <section id="how-it-works" className="how-section">
+        <Reveal className="section-heading">
           <div className="section-kicker">Data Architecture</div>
           <h2>Medallion architecture — bronze to gold in three layers.</h2>
           <p>The system implements a classic medallion pattern: raw ingestion, cleaning and typing, and quality-gated daily aggregates. PipelinePulse surfaces the full lifecycle.</p>
-        </div>
-        <div className="how-steps">
-          <div className="how-step">
-            <div className="step-number">01 — Bronze</div>
-            <div className="step-icon"><Database size={20} /></div>
-            <h3>Raw ingestion</h3>
-            <p>Source data lands unchanged in the bronze layer — REST APIs, PostgreSQL tables, or CSV uploads. Every run records row counts and freshness.</p>
-          </div>
+        </Reveal>
+        <StaggerGroup className="how-steps">
+          <StaggerItem className="how-step-item">
+            <div className="how-step">
+              <div className="step-number">01 — Bronze</div>
+              <div className="step-icon"><Database size={20} /></div>
+              <h3>Raw ingestion</h3>
+              <p>Source data lands unchanged in the bronze layer — REST APIs, PostgreSQL tables, or CSV uploads. Every run records row counts and freshness.</p>
+            </div>
+          </StaggerItem>
           <div className="step-connector"><ArrowRight size={22} /></div>
-          <div className="how-step">
-            <div className="step-number">02 — Silver</div>
-            <div className="step-icon"><Activity size={20} /></div>
-            <h3>Silver transformation</h3>
-            <p>Bronze data is cleaned, deduplicated, and typed into the silver layer. Automated quality checks flag null payloads, duplicates, and stale data before they propagate downstream.</p>
-          </div>
+          <StaggerItem className="how-step-item">
+            <div className="how-step">
+              <div className="step-number">02 — Silver</div>
+              <div className="step-icon"><Activity size={20} /></div>
+              <h3>Silver transformation</h3>
+              <p>Bronze data is cleaned, deduplicated, and typed into the silver layer. Automated quality checks flag null payloads, duplicates, and stale data before they propagate downstream.</p>
+            </div>
+          </StaggerItem>
           <div className="step-connector"><ArrowRight size={22} /></div>
-          <div className="how-step">
-            <div className="step-number">03 — Gold</div>
-            <div className="step-icon"><Sparkles size={20} /></div>
-            <h3>Business-ready output</h3>
-            <p>Gold-layer datasets are scored, timestamped, and surfaced in the observability wall. Every run leaves an audit trail visible in the control room.</p>
-          </div>
-        </div>
+          <StaggerItem className="how-step-item">
+            <div className="how-step">
+              <div className="step-number">03 — Gold</div>
+              <div className="step-icon"><Sparkles size={20} /></div>
+              <h3>Business-ready output</h3>
+              <p>Gold-layer datasets are scored, timestamped, and surfaced in the observability wall. Every run leaves an audit trail visible in the control room.</p>
+            </div>
+          </StaggerItem>
+        </StaggerGroup>
       </section>
 
-      {/* ── Project CTA ── */}
-      <section className="cta-section section-fade-in">
-        <div className="cta-card">
-          <div className="section-kicker">Get Started</div>
-          <h2>Your first pipeline can be running in two minutes.</h2>
-          <p>Sign up, load the sample pipeline or connect your own source, and watch the control room light up. Built with FastAPI, Next.js, PostgreSQL, and Google Cloud Run.</p>
+      {/* ── Try it / run it ── */}
+      <section className="cta-section">
+        <Reveal className="cta-card" y={48}>
+          <div className="section-kicker">Free & Open Source</div>
+          <h2>Try it in the browser, or clone it and make it yours.</h2>
+          <p>
+            The hosted demo runs the exact code in the repo — sign up, load the sample pipeline, and
+            poke around. Want your own instance? The deployment guide walks you from git clone to a
+            live Cloud Run service in about 30 minutes.
+          </p>
           <div className="hero-actions cta-actions" style={{ marginTop: '2rem' }}>
-            <Link href="/signup" className="primary-cta">
-              Create your account
-              <ChevronRight size={16} />
-            </Link>
-            <button type="button" className="secondary-cta" style={{ cursor: 'pointer' }} onClick={() => scrollTo('how-it-works')}>
-              Review the Architecture
-              <ArrowRight size={16} />
-            </button>
+            <Magnetic>
+              <Link href="/signup" className="primary-cta">
+                Try the live demo
+                <ChevronRight size={16} />
+              </Link>
+            </Magnetic>
+            <Magnetic>
+              <a
+                href={`${GITHUB_URL}/blob/main/DEPLOYMENT.md`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="secondary-cta"
+              >
+                Read the deployment guide
+                <ArrowRight size={16} />
+              </a>
+            </Magnetic>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ── Footer ── */}
       <footer>
-        <div className="footer-wrapper section-fade-in">
+        <Reveal className="footer-wrapper" y={24}>
           <div className="footer-inner">
             <div className="footer-brand">
               <BrandMark />
-              <p>Self-serve pipeline observability with a cinematic mission-control interface. Built with FastAPI, Next.js, PostgreSQL, and Google Cloud Run.</p>
+              <p>An open-source pipeline observability project — a cinematic mission-control interface over a real ETL engine. Built with FastAPI, Next.js, PostgreSQL, and Google Cloud Run.</p>
             </div>
             <div className="footer-col">
               <h4>Project</h4>
               <ul>
-                <li>Overview</li>
-                <li>Architecture</li>
-                <li>UI Preview</li>
-                <li>Control Room</li>
+                <li><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Source code</a></li>
+                <li><a href={`${GITHUB_URL}/blob/main/DEPLOYMENT.md`} target="_blank" rel="noopener noreferrer">Deployment guide</a></li>
+                <li><a href={`${GITHUB_URL}/issues`} target="_blank" rel="noopener noreferrer">Issues & ideas</a></li>
               </ul>
             </div>
             <div className="footer-col">
@@ -552,16 +602,15 @@ export default function HomePage() {
             <div className="footer-col">
               <h4>Connect</h4>
               <ul>
-                <li>GitHub</li>
-                <li>Portfolio</li>
-                <li>Contact</li>
+                <li><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub</a></li>
+                <li><a href="https://krishnamihir.dev" target="_blank" rel="noopener noreferrer">Portfolio</a></li>
               </ul>
             </div>
           </div>
           <div className="footer-bottom">
-            <span>PipelinePulse — pipeline observability for teams without a data platform.</span>
+            <span>PipelinePulse — an open-source pipeline observability project. Fork it, run it, improve it.</span>
           </div>
-        </div>
+        </Reveal>
       </footer>
 
       <style jsx global>{`
@@ -1492,6 +1541,65 @@ export default function HomePage() {
         @keyframes gradient-pan {
           0% { background-position: 0% 50%; }
           100% { background-position: 200% 50%; }
+        }
+
+        /* ── Stack marquee ── */
+        .marquee {
+          overflow: hidden;
+          padding: 1.15rem 0;
+          border-top: 1px solid rgba(125, 147, 182, 0.12);
+          border-bottom: 1px solid rgba(125, 147, 182, 0.12);
+          background: rgba(8, 14, 28, 0.45);
+          mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+          -webkit-mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+        }
+        .marquee-track {
+          display: flex;
+          width: max-content;
+          animation: marquee-scroll 36s linear infinite;
+        }
+        .marquee:hover .marquee-track {
+          animation-play-state: paused;
+        }
+        .marquee-item {
+          display: inline-flex;
+          align-items: center;
+          white-space: nowrap;
+          font-family: var(--font-jetbrains), monospace;
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: rgba(160, 186, 214, 0.6);
+        }
+        .marquee-dot {
+          margin: 0 1.6rem;
+          font-size: 0.45rem;
+          color: rgba(54, 226, 184, 0.55);
+        }
+        @keyframes marquee-scroll {
+          to { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .marquee-track { animation: none; }
+        }
+
+        /* ── Motion wrappers ── */
+        .how-step-item {
+          flex: 1;
+          display: flex;
+        }
+        .how-step-item .how-step {
+          flex: 1;
+        }
+
+        /* ── Footer links ── */
+        .footer-col a {
+          color: inherit;
+          text-decoration: none;
+          transition: color 180ms ease;
+        }
+        .footer-col a:hover {
+          color: #47f2bd;
         }
 
         @media (prefers-reduced-motion: reduce) {
