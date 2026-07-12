@@ -245,7 +245,7 @@ function DashboardPanel() {
               <div className="gauge-ring">
                 <span>98</span>
               </div>
-              <label>Quality score</label>
+              <label>Quality</label>
             </div>
             <div className="gauge">
               <div className="gauge-ring secondary">
@@ -1187,7 +1187,7 @@ export default function HomePage() {
 
         .dashboard-grid {
           display: grid;
-          grid-template-columns: 1.15fr 0.78fr 0.74fr;
+          grid-template-columns: 1.05fr 0.95fr 1fr;
           gap: 0.9rem;
         }
 
@@ -1251,16 +1251,19 @@ export default function HomePage() {
         .panel-stat {
           margin-top: 0.8rem;
           font-family: var(--font-space-grotesk), sans-serif;
-          font-size: 4.2rem;
+          font-size: 3.1rem;
           line-height: 0.9;
-          letter-spacing: -0.08em;
+          letter-spacing: -0.06em;
           color: #4cf0be;
         }
 
         .panel-substat {
           margin-top: 0.35rem;
           color: rgba(186, 200, 223, 0.72);
-          font-size: 0.92rem;
+          font-size: 0.85rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .panel-runlist {
@@ -1268,7 +1271,13 @@ export default function HomePage() {
           gap: 0.45rem;
           margin-top: 1rem;
           color: #dce6f5;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
+        }
+
+        .panel-runlist span {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .panel-timer-readout {
@@ -1347,18 +1356,20 @@ export default function HomePage() {
         .gauge-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 0.9rem;
+          gap: 0.6rem;
           margin-top: 1rem;
         }
 
         .gauge {
           text-align: center;
+          min-width: 0;
         }
 
         .gauge-ring {
-          width: 5.5rem;
-          height: 5.5rem;
-          margin: 0 auto 0.65rem;
+          width: min(4.1rem, 100%);
+          aspect-ratio: 1;
+          height: auto;
+          margin: 0 auto 0.55rem;
           border-radius: 999px;
           display: grid;
           place-items: center;
@@ -1367,7 +1378,7 @@ export default function HomePage() {
             conic-gradient(#4cf0be 0deg 315deg, rgba(55, 77, 110, 0.45) 315deg 360deg);
           color: #54efc3;
           font-family: var(--font-space-grotesk), sans-serif;
-          font-size: 1.5rem;
+          font-size: 1.1rem;
           font-weight: 700;
         }
 
@@ -1380,7 +1391,8 @@ export default function HomePage() {
 
         .gauge label {
           color: rgba(185, 199, 222, 0.72);
-          font-size: 0.88rem;
+          font-size: 0.78rem;
+          white-space: nowrap;
         }
 
         .bar-chart {
